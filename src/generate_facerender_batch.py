@@ -5,10 +5,8 @@ from skimage import io, img_as_float32, transform
 import torch
 import scipy.io as scio
 
-def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path, 
-                        batch_size, input_yaw_list=None, input_pitch_list=None, input_roll_list=None, 
-                        expression_scale=1.0, still_mode = False, preprocess='crop', size = 256):
-
+def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path, batch_size,
+                        expression_scale=1.0, preprocess='crop', size = 256):
     semantic_radius = 13
     video_name = os.path.splitext(os.path.split(coeff_path)[-1])[0]
     txt_path = os.path.splitext(coeff_path)[0]
@@ -46,9 +44,6 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path,
     if 'full' in preprocess.lower():
         generated_3dmm = np.concatenate([generated_3dmm, np.repeat(source_semantics[:,70:], generated_3dmm.shape[0], axis=0)], axis=1)
 
-    if still_mode:
-        generated_3dmm[:, 64:] = np.repeat(source_semantics[:, 64:], generated_3dmm.shape[0], axis=0)
-
     with open(txt_path+'.txt', 'w') as f:
         for coeff in generated_3dmm:
             for i in coeff:
@@ -73,16 +68,6 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path,
     data['video_name'] = video_name
     data['audio_path'] = audio_path
     
-    if input_yaw_list is not None:
-        yaw_c_seq = gen_camera_pose(input_yaw_list, frame_num, batch_size)
-        data['yaw_c_seq'] = torch.FloatTensor(yaw_c_seq)
-    if input_pitch_list is not None:
-        pitch_c_seq = gen_camera_pose(input_pitch_list, frame_num, batch_size)
-        data['pitch_c_seq'] = torch.FloatTensor(pitch_c_seq)
-    if input_roll_list is not None:
-        roll_c_seq = gen_camera_pose(input_roll_list, frame_num, batch_size) 
-        data['roll_c_seq'] = torch.FloatTensor(roll_c_seq)
- 
     return data
 
 def transform_semantic_1(semantic, semantic_radius):

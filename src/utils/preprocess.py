@@ -12,7 +12,7 @@ from src.face3d.models import networks
 
 from scipy.io import loadmat, savemat
 from src.utils.croper import Preprocesser
-
+import pdb
 
 import warnings
 
@@ -49,7 +49,8 @@ class CropAndExtract():
         self.propress = Preprocesser(device)
         self.net_recon = networks.define_net_recon(net_recon='resnet50', use_last_fc=False, init_path='').to(device)
         
-        if sadtalker_path['use_safetensor']:
+        if sadtalker_path['use_safetensor']: # True
+            # sadtalker_path['checkpoint'] -- './checkpoints/SadTalker_V0.0.2_256.safetensors'
             checkpoint = safetensors.torch.load_file(sadtalker_path['checkpoint'])    
             self.net_recon.load_state_dict(load_x_from_safetensor(checkpoint, 'face_3drecon'))
         else:
@@ -57,7 +58,9 @@ class CropAndExtract():
             self.net_recon.load_state_dict(checkpoint['net_recon'])
 
         self.net_recon.eval()
-        self.lm3d_std = load_lm3d(sadtalker_path['dir_of_BFM_fitting'])
+        self.lm3d_std = load_lm3d(sadtalker_path['dir_of_BFM_fitting']) # shape (5, 3)
+        # sadtalker_path['dir_of_BFM_fitting'] -- 'src/config'
+
         self.device = device
     
     def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
@@ -137,9 +140,7 @@ class CropAndExtract():
             
                 if np.mean(lm1) == -1:
                     lm1 = (self.lm3d_std[:, :2]+1)/2.
-                    lm1 = np.concatenate(
-                        [lm1[:, :1]*W, lm1[:, 1:2]*H], 1
-                    )
+                    lm1 = np.concatenate([lm1[:, :1]*W, lm1[:, 1:2]*H], 1)
                 else:
                     lm1[:, -1] = H - 1 - lm1[:, -1]
 

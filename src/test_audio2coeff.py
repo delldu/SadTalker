@@ -12,6 +12,7 @@ from src.audio2pose_models.audio2pose import Audio2Pose
 from src.audio2exp_models.networks import SimpleWrapperV2 
 from src.audio2exp_models.audio2exp import Audio2Exp
 from src.utils.safetensor_helper import load_x_from_safetensor  
+import pdb
 
 def load_cpk(checkpoint_path, model=None, optimizer=None, device="cpu"):
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
@@ -20,15 +21,20 @@ def load_cpk(checkpoint_path, model=None, optimizer=None, device="cpu"):
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint['optimizer'])
 
+    pdb.set_trace()
+    
     return checkpoint['epoch']
 
 class Audio2Coeff():
 
     def __init__(self, sadtalker_path, device):
         #load config
+        # sadtalker_path['audio2pose_yaml_path'] -- 'src/config/auido2pose.yaml'
         fcfg_pose = open(sadtalker_path['audio2pose_yaml_path'])
         cfg_pose = CN.load_cfg(fcfg_pose)
         cfg_pose.freeze()
+
+        # sadtalker_path['audio2exp_yaml_path'] -- 'src/config/auido2exp.yaml'
         fcfg_exp = open(sadtalker_path['audio2exp_yaml_path'])
         cfg_exp = CN.load_cfg(fcfg_exp)
         cfg_exp.freeze()
@@ -42,6 +48,7 @@ class Audio2Coeff():
         
         try:
             if sadtalker_path['use_safetensor']:
+                # './checkpoints/SadTalker_V0.0.2_256.safetensors'
                 checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
                 self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose'))
             else:
@@ -63,6 +70,7 @@ class Audio2Coeff():
                 load_cpk(sadtalker_path['audio2exp_checkpoint'], model=netG, device=device)
         except:
             raise Exception("Failed in loading audio2exp_checkpoint")
+
         self.audio2exp_model = Audio2Exp(netG, cfg_exp, device=device, prepare_training_loss=False)
         self.audio2exp_model = self.audio2exp_model.to(device)
         for param in self.audio2exp_model.parameters():
@@ -71,7 +79,7 @@ class Audio2Coeff():
  
         self.device = device
 
-    def generate(self, batch, coeff_save_dir, pose_style, ref_pose_coeff_path=None):
+    def generate(self, batch, coeff_save_dir, pose_style):
 
         with torch.no_grad():
             #test
@@ -96,28 +104,8 @@ class Audio2Coeff():
 
             coeffs_pred_numpy = coeffs_pred[0].clone().detach().cpu().numpy() 
 
-            if ref_pose_coeff_path is not None: 
-                 coeffs_pred_numpy = self.using_refpose(coeffs_pred_numpy, ref_pose_coeff_path)
-        
             savemat(os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['pic_name'], batch['audio_name'])),  
                     {'coeff_3dmm': coeffs_pred_numpy})
 
             return os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['pic_name'], batch['audio_name']))
     
-    def using_refpose(self, coeffs_pred_numpy, ref_pose_coeff_path):
-        num_frames = coeffs_pred_numpy.shape[0]
-        refpose_coeff_dict = loadmat(ref_pose_coeff_path)
-        refpose_coeff = refpose_coeff_dict['coeff_3dmm'][:,64:70]
-        refpose_num_frames = refpose_coeff.shape[0]
-        if refpose_num_frames<num_frames:
-            div = num_frames//refpose_num_frames
-            re = num_frames%refpose_num_frames
-            refpose_coeff_list = [refpose_coeff for i in range(div)]
-            refpose_coeff_list.append(refpose_coeff[:re, :])
-            refpose_coeff = np.concatenate(refpose_coeff_list, axis=0)
-
-        #### relative head pose
-        coeffs_pred_numpy[:, 64:70] = coeffs_pred_numpy[:, 64:70] + ( refpose_coeff[:num_frames, :] - refpose_coeff[0:1, :] )
-        return coeffs_pred_numpy
-
-

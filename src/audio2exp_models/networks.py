@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
+import pdb
 
 class Conv2d(nn.Module):
     def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True, *args, **kwargs):
@@ -46,22 +47,7 @@ class SimpleWrapperV2(nn.Module):
             Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
             )
 
-        #### load the pre-trained audio_encoder 
-        #self.audio_encoder = self.audio_encoder.to(device)  
-        '''
-        wav2lip_state_dict = torch.load('/apdcephfs_cq2/share_1290939/wenxuazhang/checkpoints/wav2lip.pth')['state_dict']
-        state_dict = self.audio_encoder.state_dict()
-
-        for k,v in wav2lip_state_dict.items():
-            if 'audio_encoder' in k:
-                print('init:', k)
-                state_dict[k.replace('module.audio_encoder.', '')] = v
-        self.audio_encoder.load_state_dict(state_dict)
-        '''
-
         self.mapping1 = nn.Linear(512+64+1, 64)
-        #self.mapping2 = nn.Linear(30, 64)
-        #nn.init.constant_(self.mapping1.weight, 0.)
         nn.init.constant_(self.mapping1.bias, 0.)
 
     def forward(self, x, ref, ratio):

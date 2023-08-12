@@ -3,13 +3,16 @@ from torch import nn
 from src.audio2pose_models.cvae import CVAE
 from src.audio2pose_models.discriminator import PoseSequenceDiscriminator
 from src.audio2pose_models.audio_encoder import AudioEncoder
+import pdb
 
 class Audio2Pose(nn.Module):
     def __init__(self, cfg, wav2lip_checkpoint, device='cuda'):
         super().__init__()
+        # wav2lip_checkpoint = None
+
         self.cfg = cfg
-        self.seq_len = cfg.MODEL.CVAE.SEQ_LEN
-        self.latent_dim = cfg.MODEL.CVAE.LATENT_SIZE
+        self.seq_len = cfg.MODEL.CVAE.SEQ_LEN # 32
+        self.latent_dim = cfg.MODEL.CVAE.LATENT_SIZE # 64
         self.device = device
 
         self.audio_encoder = AudioEncoder(wav2lip_checkpoint, device)
@@ -18,11 +21,10 @@ class Audio2Pose(nn.Module):
             param.requires_grad = False
 
         self.netG = CVAE(cfg)
-        self.netD_motion = PoseSequenceDiscriminator(cfg)
-        
-        
-    def forward(self, x):
+        self.netD_motion = PoseSequenceDiscriminator(cfg) # useless ???
 
+
+    def forward(self, x):
         batch = {}
         coeff_gt = x['gt'].cuda().squeeze(0)           #bs frame_len+1 73
         batch['pose_motion_gt'] = coeff_gt[:, 1:, 64:70] - coeff_gt[:, :1, 64:70] #bs frame_len 6
