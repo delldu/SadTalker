@@ -23,7 +23,6 @@ class DenseMotionNetwork(nn.Module):
         self.norm = BatchNorm3d(compress, affine=True)
 
         if estimate_occlusion_map: # True ?
-            # self.occlusion = nn.Conv2d(reshape_channel*reshape_depth, 1, kernel_size=7, padding=3)
             self.occlusion = nn.Conv2d(self.hourglass.out_filters*reshape_depth, 1, kernel_size=7, padding=3)
         else:
             self.occlusion = None

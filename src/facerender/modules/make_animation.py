@@ -77,7 +77,7 @@ def keypoint_transformation(kp_canonical, he, wo_exp=False):
     return {'value': kp_transformed}
 
 
-
+# xxxx1111
 def make_animation(source_image, source_semantics, target_semantics,
                             generator, kp_detector, mapping):
     with torch.no_grad():
@@ -101,29 +101,3 @@ def make_animation(source_image, source_semantics, target_semantics,
         predictions_ts = torch.stack(predictions, dim=1)
     return predictions_ts
 
-# class AnimateModel(torch.nn.Module):
-#     """
-#     Merge all generator related updates into single model for better multi-gpu usage
-#     """
-
-#     def __init__(self, generator, kp_extractor, mapping):
-#         super(AnimateModel, self).__init__()
-#         self.kp_extractor = kp_extractor
-#         self.generator = generator
-#         self.mapping = mapping
-
-#         self.kp_extractor.eval()
-#         self.generator.eval()
-#         self.mapping.eval()
-
-#     def forward(self, x):
-        
-#         source_image = x['source_image']
-#         source_semantics = x['source_semantics']
-#         target_semantics = x['target_semantics']
-
-#         predictions_video = make_animation(source_image, source_semantics, target_semantics,
-#                                         self.generator, self.kp_extractor,
-#                                         self.mapping)
-
-#         return predictions_video
