@@ -134,12 +134,12 @@ class CropAndExtract():
             # load 3dmm paramter generator from Deep3DFaceRecon_pytorch 
             video_coeffs, full_coeffs = [],  []
             for idx in tqdm(range(len(frames_pil)), desc='3DMM Extraction In Video:'):
-                frame = frames_pil[idx]
+                frame = frames_pil[idx] # PIL.Image.Image image mode=RGB size=256x256
                 W,H = frame.size
                 lm1 = lm[idx].reshape([-1, 2])
             
-                if np.mean(lm1) == -1:
-                    lm1 = (self.lm3d_std[:, :2]+1)/2.
+                if np.mean(lm1) == -1: # NO face !!!
+                    lm1 = (self.lm3d_std[:, :2]+1)/2. # (x,y,z) ==> (x, y)
                     lm1 = np.concatenate([lm1[:, :1]*W, lm1[:, 1:2]*H], 1)
                 else:
                     lm1[:, -1] = H - 1 - lm1[:, -1]
@@ -148,23 +148,37 @@ class CropAndExtract():
  
                 trans_params = np.array([float(item) for item in np.hsplit(trans_params, 5)]).astype(np.float32)
                 im_t = torch.tensor(np.array(im1)/255., dtype=torch.float32).permute(2, 0, 1).to(self.device).unsqueeze(0)
-                
+
+                # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                # im1 -- <PIL.Image.Image image mode=RGB size=224x224>
+                # im_t.size() -- [1, 3, 224, 224]
+
                 with torch.no_grad():
                     full_coeff = self.net_recon(im_t)
                     coeffs = split_coeff(full_coeff)
 
                 pred_coeff = {key:coeffs[key].cpu().numpy() for key in coeffs}
- 
+                # full_coeff.size() -- [1, 257]
+                # (Pdb) for k, v in coeffs.items(): print(k, ":", list(v.size()))
+                # id : [1, 80]
+                # exp : [1, 64]
+                # tex : [1, 80]
+                # angle : [1, 3]
+                # gamma : [1, 27]
+                # trans : [1, 3]
+                # trans_params -- array([256., 256., 0.99591, 129.40619, 105.512375], dtype=float32)
+                # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                
+        
                 pred_coeff = np.concatenate([
                     pred_coeff['exp'], 
                     pred_coeff['angle'],
                     pred_coeff['trans'],
-                    trans_params[2:][None],
+                    trans_params[2:][None], # array([[  0.99591 , 129.40619 , 105.512375]], dtype=float32) ???
                     ], 1)
                 video_coeffs.append(pred_coeff)
-                full_coeffs.append(full_coeff.cpu().numpy())
+                full_coeffs.append(full_coeff.cpu().numpy()) # useless
 
-            semantic_npy = np.array(video_coeffs)[:,0] 
+            semantic_npy = np.array(video_coeffs)[:, 0] 
 
             savemat(coeff_path, {'coeff_3dmm': semantic_npy, 'full_3dmm': np.array(full_coeffs)[0]})
 

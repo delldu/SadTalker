@@ -26,6 +26,9 @@ def load_cpk(checkpoint_path, model=None, optimizer=None, device="cpu"):
     return checkpoint['epoch']
 
 class Audio2Coeff():
+    '''
+        ==> (200, 70) --70 = pose(6) + exp(64)
+    '''
 
     def __init__(self, sadtalker_path, device):
         #load config
@@ -76,6 +79,8 @@ class Audio2Coeff():
         for param in self.audio2exp_model.parameters():
             param.requires_grad = False
         self.audio2exp_model.eval()
+
+        # xxxx8888
  
         self.device = device
 
@@ -83,26 +88,37 @@ class Audio2Coeff():
 
         with torch.no_grad():
             #test
+
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             results_dict_exp= self.audio2exp_model.test(batch)
             exp_pred = results_dict_exp['exp_coeff_pred']                         #bs T 64
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             #for class_id in  range(1):
             #class_id = 0#(i+10)%45
             #class_id = random.randint(0,46)                                   #46 styles can be selected 
             batch['class'] = torch.LongTensor([pose_style]).to(self.device)
+
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             results_dict_pose = self.audio2pose_model.test(batch) 
             pose_pred = results_dict_pose['pose_pred']                        #bs T 6
+            # results_dict_pose['pose_pred'].size() -- [1, 200, 6]
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             pose_len = pose_pred.shape[1]
-            if pose_len<13: 
+            if pose_len<13: # False
                 pose_len = int((pose_len-1)/2)*2+1
                 pose_pred = torch.Tensor(savgol_filter(np.array(pose_pred.cpu()), pose_len, 2, axis=1)).to(self.device)
             else:
                 pose_pred = torch.Tensor(savgol_filter(np.array(pose_pred.cpu()), 13, 2, axis=1)).to(self.device) 
-            
+            # pose_pred.size() -- [1, 200, 6]
+            # exp_pred.size() -- [1, 200, 64]
+
             coeffs_pred = torch.cat((exp_pred, pose_pred), dim=-1)            #bs T 70
+            # ==> coeffs_pred.size() -- [1, 200, 70]
 
             coeffs_pred_numpy = coeffs_pred[0].clone().detach().cpu().numpy() 
+            # coeffs_pred_numpy.shape -- (200, 70)
 
             savemat(os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['pic_name'], batch['audio_name'])),  
                     {'coeff_3dmm': coeffs_pred_numpy})

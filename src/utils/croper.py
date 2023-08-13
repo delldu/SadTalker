@@ -1,20 +1,11 @@
-import os
 import cv2
-import time
-import glob
-import argparse
-import scipy
 import numpy as np
 from PIL import Image
 import torch
-from tqdm import tqdm
-from itertools import cycle
 
 from src.face3d.extract_kp_videos_safe import KeypointExtractor
 from facexlib.alignment import landmark_98_to_68
 
-import numpy as np
-from PIL import Image
 
 class Preprocesser:
     def __init__(self, device='cuda'):
@@ -100,18 +91,6 @@ class Preprocesser:
                int(np.ceil(max(quad[:, 1]))))
         pad = (max(-pad[0] + border, 0), max(-pad[1] + border, 0), max(pad[2] - img.size[0] + border, 0),
                max(pad[3] - img.size[1] + border, 0))
-        # if enable_padding and max(pad) > border - 4:
-        #     pad = np.maximum(pad, int(np.rint(qsize * 0.3)))
-        #     img = np.pad(np.float32(img), ((pad[1], pad[3]), (pad[0], pad[2]), (0, 0)), 'reflect')
-        #     h, w, _ = img.shape
-        #     y, x, _ = np.ogrid[:h, :w, :1]
-        #     mask = np.maximum(1.0 - np.minimum(np.float32(x) / pad[0], np.float32(w - 1 - x) / pad[2]),
-        #                       1.0 - np.minimum(np.float32(y) / pad[1], np.float32(h - 1 - y) / pad[3]))
-        #     blur = qsize * 0.02
-        #     img += (scipy.ndimage.gaussian_filter(img, [blur, blur, 0]) - img) * np.clip(mask * 3.0 + 1.0, 0.0, 1.0)
-        #     img += (np.median(img, axis=(0, 1)) - img) * np.clip(mask, 0.0, 1.0)
-        #     img = Image.fromarray(np.uint8(np.clip(np.rint(img), 0, 255)), 'RGB')
-        #     quad += pad[:2]
 
         # Transform.
         quad = (quad + 0.5).flatten()

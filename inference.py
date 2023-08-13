@@ -24,7 +24,8 @@ def main(args):
 
     current_root_path = os.path.split(sys.argv[0])[0]
 
-    sadtalker_paths = init_path(args.checkpoint_dir, os.path.join(current_root_path, 'src/config'), args.size, args.preprocess)
+    sadtalker_paths = init_path(args.checkpoint_dir, os.path.join(current_root_path, 'src/config'),
+                                args.size, args.preprocess)
 
     #init model
     preprocess_model = CropAndExtract(sadtalker_paths, device)
@@ -78,10 +79,9 @@ if __name__ == '__main__':
     parser.add_argument("--preprocess", default='crop', choices=['crop', 'extcrop', 'resize', 'full', 'extfull'], help="how to preprocess the images" ) 
     parser.add_argument("--verbose",action="store_true", help="saving the intermedia output or not" ) 
 
-
     # net structure and parameters
     parser.add_argument('--net_recon', type=str, default='resnet50', choices=['resnet18', 'resnet34', 'resnet50'], help='useless')
-    parser.add_argument('--init_path', type=str, default=None, help='Useless')
+    # parser.add_argument('--init_path', type=str, default=None, help='Useless')
     parser.add_argument('--use_last_fc',default=False, help='zero initialize the last fc')
     parser.add_argument('--bfm_folder', type=str, default='./checkpoints/BFM_Fitting/')
     parser.add_argument('--bfm_model', type=str, default='BFM_model_front.mat', help='bfm model')
