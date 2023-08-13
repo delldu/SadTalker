@@ -6,22 +6,36 @@ import torch.nn.functional as F
 
 
 class MappingNet(nn.Module):
-    def __init__(self, coeff_nc, descriptor_nc, layer, num_kp, num_bins):
+    '''
+    src/config/facerender.yaml
+
+      mapping_params:
+          coeff_nc: 70
+          descriptor_nc: 1024
+          layer: 3
+          num_kp: 15
+          num_bins: 66
+
+    '''
+    def __init__(self, 
+        coeff_nc=70, 
+        descriptor_nc=1024, 
+        layer=3, 
+        num_kp=15, 
+        num_bins=66,
+    ):
         super( MappingNet, self).__init__()
 
         self.layer = layer
-        nonlinearity = nn.LeakyReLU(0.1)
-
         self.first = nn.Sequential(
             torch.nn.Conv1d(coeff_nc, descriptor_nc, kernel_size=7, padding=0, bias=True))
 
         for i in range(layer):
-            net = nn.Sequential(nonlinearity,
+            net = nn.Sequential(nn.LeakyReLU(0.1),
                 torch.nn.Conv1d(descriptor_nc, descriptor_nc, kernel_size=3, padding=0, dilation=3))
             setattr(self, 'encoder' + str(i), net)   
 
         self.pooling = nn.AdaptiveAvgPool1d(1)
-        self.output_nc = descriptor_nc
 
         self.fc_roll = nn.Linear(descriptor_nc, num_bins)
         self.fc_pitch = nn.Linear(descriptor_nc, num_bins)
@@ -31,9 +45,9 @@ class MappingNet(nn.Module):
 
     def forward(self, input_3dmm):
         out = self.first(input_3dmm)
-        for i in range(self.layer):
+        for i in range(self.layer): # self.layer -- 3
             model = getattr(self, 'encoder' + str(i))
-            out = model(out) + out[:,:,3:-3]
+            out = model(out) + out[:,:, 3:-3]
         out = self.pooling(out)
         out = out.view(out.shape[0], -1)
         #print('out:', out.shape)

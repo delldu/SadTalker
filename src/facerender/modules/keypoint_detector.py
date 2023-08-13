@@ -12,22 +12,39 @@ import pdb
 class KPDetector(nn.Module):
     """
     Detecting canonical keypoints. Return keypoint position and jacobian near each keypoint.
+
+    src/config/facerender.yml
+      common_params:
+        num_kp: 15 
+        image_channel: 3                    
+        feature_channel: 32
+        estimate_jacobian: False   # True
+
+      kp_detector_params:
+         temperature: 0.1
+         block_expansion: 32            
+         max_features: 1024
+         scale_factor: 0.25         # 0.25
+         num_blocks: 5
+         reshape_channel: 16384  # 16384 = 1024 * 16
+         reshape_depth: 16
+
     """
 
-    def __init__(self, block_expansion, feature_channel, num_kp, image_channel, 
-                max_features, reshape_channel, reshape_depth, num_blocks, temperature, scale_factor=1.0, estimate_jacobian=False):
+    def __init__(self, 
+            block_expansion=32, 
+            feature_channel=32, 
+            num_kp=15, 
+            image_channel=3, 
+            max_features=1024, 
+            reshape_channel=16384, 
+            reshape_depth=16, 
+            num_blocks=5, 
+            temperature=0.1, 
+            scale_factor=0.25,
+            # estimate_jacobian=False, 
+        ):
         super(KPDetector, self).__init__()
-        # block_expansion = 32
-        # feature_channel = 32
-        # num_kp = 15
-        # image_channel = 3
-        # max_features = 1024
-        # reshape_channel = 16384
-        # reshape_depth = 16
-        # num_blocks = 5
-        # temperature = 0.1
-        # scale_factor = 0.25
-
         self.predictor = KPHourglass(block_expansion, in_features=image_channel,
                                      max_features=max_features, reshape_features=reshape_channel,
                                      reshape_depth=reshape_depth, num_blocks=num_blocks)

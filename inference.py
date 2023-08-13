@@ -81,7 +81,6 @@ if __name__ == '__main__':
 
     # net structure and parameters
     parser.add_argument('--net_recon', type=str, default='resnet50', choices=['resnet18', 'resnet34', 'resnet50'], help='useless')
-    # parser.add_argument('--init_path', type=str, default=None, help='Useless')
     parser.add_argument('--use_last_fc',default=False, help='zero initialize the last fc')
     parser.add_argument('--bfm_folder', type=str, default='./checkpoints/BFM_Fitting/')
     parser.add_argument('--bfm_model', type=str, default='BFM_model_front.mat', help='bfm model')

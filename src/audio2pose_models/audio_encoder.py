@@ -19,7 +19,7 @@ class Conv2d(nn.Module):
         return self.act(out)
 
 class AudioEncoder(nn.Module):
-    def __init__(self, wav2lip_checkpoint, device):
+    def __init__(self, device):
         super(AudioEncoder, self).__init__()
 
         self.audio_encoder = nn.Sequential(

@@ -1,9 +1,8 @@
 import os 
 import torch
 import numpy as np
-from scipy.io import savemat, loadmat
-from yacs.config import CfgNode as CN
-from scipy.signal import savgol_filter
+from scipy.io import savemat
+from scipy.signal import savgol_filter # xxxx8888
 
 import safetensors
 import safetensors.torch 
@@ -25,7 +24,7 @@ def load_cpk(checkpoint_path, model=None, optimizer=None, device="cpu"):
     
     return checkpoint['epoch']
 
-class Audio2Coeff():
+class Audio2Coeff(): # xxxx8888
     '''
         ==> (200, 70) --70 = pose(6) + exp(64)
     '''
@@ -33,17 +32,10 @@ class Audio2Coeff():
     def __init__(self, sadtalker_path, device):
         #load config
         # sadtalker_path['audio2pose_yaml_path'] -- 'src/config/auido2pose.yaml'
-        fcfg_pose = open(sadtalker_path['audio2pose_yaml_path'])
-        cfg_pose = CN.load_cfg(fcfg_pose)
-        cfg_pose.freeze()
-
         # sadtalker_path['audio2exp_yaml_path'] -- 'src/config/auido2exp.yaml'
-        fcfg_exp = open(sadtalker_path['audio2exp_yaml_path'])
-        cfg_exp = CN.load_cfg(fcfg_exp)
-        cfg_exp.freeze()
 
         # load audio2pose_model
-        self.audio2pose_model = Audio2Pose(cfg_pose, None, device=device)
+        self.audio2pose_model = Audio2Pose(device=device)
         self.audio2pose_model = self.audio2pose_model.to(device)
         self.audio2pose_model.eval()
         for param in self.audio2pose_model.parameters():
@@ -74,7 +66,7 @@ class Audio2Coeff():
         except:
             raise Exception("Failed in loading audio2exp_checkpoint")
 
-        self.audio2exp_model = Audio2Exp(netG, cfg_exp, device=device, prepare_training_loss=False)
+        self.audio2exp_model = Audio2Exp(netG, device=device)
         self.audio2exp_model = self.audio2exp_model.to(device)
         for param in self.audio2exp_model.parameters():
             param.requires_grad = False
@@ -90,7 +82,7 @@ class Audio2Coeff():
             #test
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            results_dict_exp= self.audio2exp_model.test(batch)
+            results_dict_exp= self.audio2exp_model(batch)
             exp_pred = results_dict_exp['exp_coeff_pred']                         #bs T 64
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -100,7 +92,7 @@ class Audio2Coeff():
             batch['class'] = torch.LongTensor([pose_style]).to(self.device)
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            results_dict_pose = self.audio2pose_model.test(batch) 
+            results_dict_pose = self.audio2pose_model(batch) 
             pose_pred = results_dict_pose['pose_pred']                        #bs T 6
             # results_dict_pose['pose_pred'].size() -- [1, 200, 6]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

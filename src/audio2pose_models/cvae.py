@@ -1,25 +1,42 @@
 import torch
-import torch.nn.functional as F
 from torch import nn
+import torch.nn.functional as F
 from src.audio2pose_models.res_unet import ResUnet
+import pdb
 
-def class2onehot(idx, class_num):
-
-    assert torch.max(idx).item() < class_num
-    onehot = torch.zeros(idx.size(0), class_num).to(idx.device)
-    onehot.scatter_(1, idx, 1)
-    return onehot
 
 class CVAE(nn.Module):
-    def __init__(self, cfg):
+    '''
+    src/config/audio2pose.yaml
+
+    DATASET:
+      NUM_CLASSES: 46
+
+    MODEL:
+      AUDIOENCODER:
+        LEAKY_RELU: True
+        NORM: 'IN'
+      DISCRIMINATOR:
+        LEAKY_RELU: False
+        INPUT_CHANNELS: 6
+      CVAE:
+        AUDIO_EMB_IN_SIZE: 512
+        AUDIO_EMB_OUT_SIZE: 6
+        SEQ_LEN: 32
+        LATENT_SIZE: 64
+        ENCODER_LAYER_SIZES: [192, 128]
+        DECODER_LAYER_SIZES: [128, 192]
+
+    '''
+    def __init__(self):
         super().__init__()
-        encoder_layer_sizes = cfg.MODEL.CVAE.ENCODER_LAYER_SIZES
-        decoder_layer_sizes = cfg.MODEL.CVAE.DECODER_LAYER_SIZES
-        latent_size = cfg.MODEL.CVAE.LATENT_SIZE
-        num_classes = cfg.DATASET.NUM_CLASSES
-        audio_emb_in_size = cfg.MODEL.CVAE.AUDIO_EMB_IN_SIZE
-        audio_emb_out_size = cfg.MODEL.CVAE.AUDIO_EMB_OUT_SIZE
-        seq_len = cfg.MODEL.CVAE.SEQ_LEN
+        encoder_layer_sizes = [192, 128] # cfg.MODEL.CVAE.ENCODER_LAYER_SIZES
+        decoder_layer_sizes = [128, 192] # cfg.MODEL.CVAE.DECODER_LAYER_SIZES
+        latent_size = 64 # cfg.MODEL.CVAE.LATENT_SIZE
+        num_classes = 46 # cfg.DATASET.NUM_CLASSES
+        audio_emb_in_size = 512 # cfg.MODEL.CVAE.AUDIO_EMB_IN_SIZE
+        audio_emb_out_size = 6 # cfg.MODEL.CVAE.AUDIO_EMB_OUT_SIZE
+        seq_len = 32 # fg.MODEL.CVAE.SEQ_LEN
 
         self.latent_size = latent_size
 
@@ -27,6 +44,7 @@ class CVAE(nn.Module):
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
         self.decoder = DECODER(decoder_layer_sizes, latent_size, num_classes,
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
+
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)

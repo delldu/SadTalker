@@ -4,7 +4,7 @@ from PIL import Image
 import torch
 
 from src.face3d.extract_kp_videos_safe import KeypointExtractor
-from facexlib.alignment import landmark_98_to_68
+from facexlib.alignment import landmark_98_to_68 # xxxx8888
 
 
 class Preprocesser:

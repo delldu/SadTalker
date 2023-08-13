@@ -1,23 +1,17 @@
 import numpy as np
-import cv2, os, sys, torch
+import cv2, os, torch
 from tqdm import tqdm
 from PIL import Image 
 
-# 3dmm extraction
-import safetensors
 import safetensors.torch 
 from src.face3d.util.preprocess import align_img
 from src.face3d.util.load_mats import load_lm3d
 from src.face3d.models import networks
 
-from scipy.io import loadmat, savemat
+from scipy.io import savemat
 from src.utils.croper import Preprocesser
-import pdb
-
-import warnings
-
 from src.utils.safetensor_helper import load_x_from_safetensor 
-warnings.filterwarnings("ignore")
+import pdb
 
 def split_coeff(coeffs):
         """
@@ -43,19 +37,15 @@ def split_coeff(coeffs):
         }
 
 
-class CropAndExtract():
+class CropAndExtract(): # xxxx8888
     def __init__(self, sadtalker_path, device):
 
         self.propress = Preprocesser(device)
         self.net_recon = networks.define_net_recon(net_recon='resnet50', use_last_fc=False, init_path='').to(device)
         
-        if sadtalker_path['use_safetensor']: # True
-            # sadtalker_path['checkpoint'] -- './checkpoints/SadTalker_V0.0.2_256.safetensors'
-            checkpoint = safetensors.torch.load_file(sadtalker_path['checkpoint'])    
-            self.net_recon.load_state_dict(load_x_from_safetensor(checkpoint, 'face_3drecon'))
-        else:
-            checkpoint = torch.load(sadtalker_path['path_of_net_recon_model'], map_location=torch.device(device))    
-            self.net_recon.load_state_dict(checkpoint['net_recon'])
+        # sadtalker_path['checkpoint'] -- './checkpoints/SadTalker_V0.0.2_256.safetensors'
+        checkpoint = safetensors.torch.load_file(sadtalker_path['checkpoint'])    
+        self.net_recon.load_state_dict(load_x_from_safetensor(checkpoint, 'face_3drecon'))
 
         self.net_recon.eval()
         self.lm3d_std = load_lm3d(sadtalker_path['dir_of_BFM_fitting']) # shape (5, 3)

@@ -23,7 +23,7 @@ def parse_audio_length(audio_length, sr, fps):
 
     return audio_length, num_frames
 
-
+# xxxx8888
 def generate_blink_seq_randomly(num_frames):
     ratio = np.zeros((num_frames, 1))
     if num_frames<=20:
@@ -72,9 +72,10 @@ def get_data(first_coeff_path, audio_path, device):
     ratio = generate_blink_seq_randomly(num_frames)      # T
     source_semantics_path = first_coeff_path
     source_semantics_dict = scio.loadmat(source_semantics_path) # ./results/2023_08_13_10.45.38/first_frame_dir/dell.mat'
+
+    # 'coeff_3dmm' -- exp -- 64, angle -- 3, face trans -- 3, whole image trans -- 3 ==> total dim 73
     ref_coeff = source_semantics_dict['coeff_3dmm'][:1,:70]   #shape -- (1, 73) ==> 1 70
     ref_coeff = np.repeat(ref_coeff, num_frames, axis=0) # ==> shape -- (200, 70)
-
     
     indiv_mels = torch.FloatTensor(indiv_mels).unsqueeze(1).unsqueeze(0) # bs T 1 80 16
 

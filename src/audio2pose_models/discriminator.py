@@ -57,13 +57,21 @@ class ConvNormRelu(nn.Module):
 
 
 class PoseSequenceDiscriminator(nn.Module):
-    def __init__(self, cfg):
-        super().__init__()
-        self.cfg = cfg
-        leaky = self.cfg.MODEL.DISCRIMINATOR.LEAKY_RELU
+    '''
+    src/config/audio2pose.yaml
 
+    MODEL:
+      DISCRIMINATOR:
+        LEAKY_RELU: False
+        INPUT_CHANNELS: 6
+    '''
+
+    def __init__(self):
+        super().__init__()
+        leaky = False
+        input_channels = 6 # cfg.MODEL.DISCRIMINATOR.INPUT_CHANNELS
         self.seq = nn.Sequential(
-            ConvNormRelu('1d', cfg.MODEL.DISCRIMINATOR.INPUT_CHANNELS, 256, downsample=True, leaky=leaky),  # B, 256, 64
+            ConvNormRelu('1d', input_channels, 256, downsample=True, leaky=leaky),  # B, 256, 64
             ConvNormRelu('1d', 256, 512, downsample=True, leaky=leaky),  # B, 512, 32
             ConvNormRelu('1d', 512, 1024, kernel_size=3, stride=1, padding=1, leaky=leaky),  # B, 1024, 16
             nn.Conv1d(1024, 1, kernel_size=3, stride=1, padding=1, bias=True)  # B, 1, 16

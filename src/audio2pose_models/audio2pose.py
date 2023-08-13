@@ -6,49 +6,32 @@ from src.audio2pose_models.audio_encoder import AudioEncoder
 import pdb
 
 class Audio2Pose(nn.Module):
-    def __init__(self, cfg, wav2lip_checkpoint, device='cuda'):
-        super().__init__()
-        # wav2lip_checkpoint = None
+    '''
+    src/config/audio2pose.yaml
 
-        self.cfg = cfg
-        self.seq_len = cfg.MODEL.CVAE.SEQ_LEN # 32
-        self.latent_dim = cfg.MODEL.CVAE.LATENT_SIZE # 64
+      CVAE:
+        AUDIO_EMB_IN_SIZE: 512
+        AUDIO_EMB_OUT_SIZE: 6
+        SEQ_LEN: 32
+        LATENT_SIZE: 64
+        ENCODER_LAYER_SIZES: [192, 128]
+        DECODER_LAYER_SIZES: [128, 192]
+    '''
+    def __init__(self, device='cuda'):
+        super().__init__()
+        self.seq_len = 32
+        self.latent_dim = 64
         self.device = device
 
-        self.audio_encoder = AudioEncoder(wav2lip_checkpoint, device)
+        self.audio_encoder = AudioEncoder(device)
         self.audio_encoder.eval()
         for param in self.audio_encoder.parameters():
             param.requires_grad = False
 
-        self.netG = CVAE(cfg)
-        self.netD_motion = PoseSequenceDiscriminator(cfg) # useless ???
-
+        self.netG = CVAE()
+        self.netD_motion = PoseSequenceDiscriminator() # useless ???
 
     def forward(self, x):
-        batch = {}
-        coeff_gt = x['gt'].cuda().squeeze(0)           #bs frame_len+1 73
-        batch['pose_motion_gt'] = coeff_gt[:, 1:, 64:70] - coeff_gt[:, :1, 64:70] #bs frame_len 6
-        batch['ref'] = coeff_gt[:, 0, 64:70]  #bs  6
-        batch['class'] = x['class'].squeeze(0).cuda() # bs
-        indiv_mels= x['indiv_mels'].cuda().squeeze(0) # bs seq_len+1 80 16
-
-        # forward
-        audio_emb_list = []
-        audio_emb = self.audio_encoder(indiv_mels[:, 1:, :, :].unsqueeze(2)) #bs seq_len 512
-        batch['audio_emb'] = audio_emb
-        batch = self.netG(batch)
-
-        pose_motion_pred = batch['pose_motion_pred']           # bs frame_len 6
-        pose_gt = coeff_gt[:, 1:, 64:70].clone()               # bs frame_len 6
-        pose_pred = coeff_gt[:, :1, 64:70] + pose_motion_pred  # bs frame_len 6
-
-        batch['pose_pred'] = pose_pred
-        batch['pose_gt'] = pose_gt
-
-        return batch
-
-    def test(self, x):
-
         batch = {}
         ref = x['ref']                            #bs 1 70
         batch['ref'] = x['ref'][:,0,-6:]  

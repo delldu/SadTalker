@@ -10,7 +10,7 @@ from src.utils.init_path import init_path
 
 from pydub import AudioSegment
 
-
+# xxxx8888
 def mp3_to_wav(mp3_filename,wav_filename,frame_rate):
     mp3_file = AudioSegment.from_file(file=mp3_filename)
     mp3_file.set_frame_rate(frame_rate).export(wav_filename,format="wav")

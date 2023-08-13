@@ -9,24 +9,36 @@ from src.facerender.sync_batchnorm import SynchronizedBatchNorm3d as BatchNorm3d
 class DenseMotionNetwork(nn.Module):
     """
     Module that predicting a dense motion from sparse motion representation given by kp_source and kp_driving
+    src/config/facerender.yaml
+        dense_motion_params:
+          block_expansion: 32
+          max_features: 1024
+          num_blocks: 5
+          reshape_depth: 16
+          compress: 4    
     """
 
-    def __init__(self, block_expansion, num_blocks, max_features, num_kp, feature_channel, reshape_depth, compress,
-                 estimate_occlusion_map=False):
+    def __init__(self, 
+                block_expansion=32, 
+                num_blocks=5, 
+                max_features=1024, 
+                num_kp=15, 
+                feature_channel=32, 
+                reshape_depth=16, 
+                compress=4,
+            ):
         super(DenseMotionNetwork, self).__init__()
-        # self.hourglass = Hourglass(block_expansion=block_expansion, in_features=(num_kp+1)*(feature_channel+1), max_features=max_features, num_blocks=num_blocks)
-        self.hourglass = Hourglass(block_expansion=block_expansion, in_features=(num_kp+1)*(compress+1), max_features=max_features, num_blocks=num_blocks)
+        self.hourglass = Hourglass(
+                block_expansion=block_expansion, 
+                in_features=(num_kp+1)*(compress+1), 
+                max_features=max_features, 
+                num_blocks=num_blocks)
 
         self.mask = nn.Conv3d(self.hourglass.out_filters, num_kp + 1, kernel_size=7, padding=3)
 
         self.compress = nn.Conv3d(feature_channel, compress, kernel_size=1)
         self.norm = BatchNorm3d(compress, affine=True)
-
-        if estimate_occlusion_map: # True ?
-            self.occlusion = nn.Conv2d(self.hourglass.out_filters*reshape_depth, 1, kernel_size=7, padding=3)
-        else:
-            self.occlusion = None
-
+        self.occlusion = nn.Conv2d(self.hourglass.out_filters*reshape_depth, 1, kernel_size=7, padding=3)
         self.num_kp = num_kp
 
 
@@ -111,10 +123,9 @@ class DenseMotionNetwork(nn.Module):
 
         out_dict['deformation'] = deformation
 
-        if self.occlusion:
-            bs, c, d, h, w = prediction.shape
-            prediction = prediction.view(bs, -1, h, w)
-            occlusion_map = torch.sigmoid(self.occlusion(prediction))
-            out_dict['occlusion_map'] = occlusion_map
+        bs, c, d, h, w = prediction.shape
+        prediction = prediction.view(bs, -1, h, w)
+        occlusion_map = torch.sigmoid(self.occlusion(prediction))
+        out_dict['occlusion_map'] = occlusion_map
 
         return out_dict
