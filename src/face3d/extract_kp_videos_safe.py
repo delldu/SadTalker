@@ -1,8 +1,6 @@
 import os
-import cv2
 import time
 import numpy as np
-from PIL import Image
 import torch
 from tqdm import tqdm
 
@@ -93,16 +91,3 @@ class KeypointExtractor():
                 np.savetxt(os.path.splitext(name)[0]+'.txt', keypoints.reshape(-1))
             return keypoints
 
-# def read_video(filename):
-#     frames = []
-#     cap = cv2.VideoCapture(filename)
-#     while cap.isOpened():
-#         ret, frame = cap.read()
-#         if ret:
-#             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-#             frame = Image.fromarray(frame)
-#             frames.append(frame)
-#         else:
-#             break
-#     cap.release()
-#     return frames

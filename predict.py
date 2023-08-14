@@ -97,10 +97,10 @@ class Predictor(BasePredictor):
         os.makedirs(first_frame_dir)
 
         print("3DMM Extraction for source image")
-        first_coeff_path, crop_pic_path, crop_info = self.preprocess_model.generate(
+        image_coeff_path, crop_pic_path, crop_info = self.preprocess_model.generate(
             args.pic_path, first_frame_dir, preprocess, source_image_flag=True
         )
-        if first_coeff_path is None:
+        if image_coeff_path is None:
             print("Can't get the coeffs of the input")
             return
 
@@ -133,7 +133,7 @@ class Predictor(BasePredictor):
 
         # audio2ceoff
         batch = get_data(
-            first_coeff_path,
+            image_coeff_path,
             args.audio_path,
             device,
             ref_eyeblink_coeff_path,
@@ -147,7 +147,7 @@ class Predictor(BasePredictor):
         data = get_facerender_data(
             coeff_path,
             crop_pic_path,
-            first_coeff_path,
+            image_coeff_path,
             args.audio_path,
             args.batch_size,
             args.input_yaw,

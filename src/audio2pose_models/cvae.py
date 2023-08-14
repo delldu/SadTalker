@@ -2,8 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from src.audio2pose_models.res_unet import ResUnet
+from src.utils.debug import debug_var
 import pdb
-
 
 class CVAE(nn.Module):
     '''
@@ -92,7 +92,7 @@ class Encoder(nn.Module):
     def forward(self, batch):
         class_id = batch['class']
         pose_motion_gt = batch['pose_motion_gt']                             #bs seq_len 6
-        ref = batch['ref']                             #bs 6
+        pose = batch['pose']                             #bs 6
         bs = pose_motion_gt.shape[0]
         audio_in = batch['audio_emb']                          # bs seq_len audio_emb_in_size
 
@@ -106,7 +106,7 @@ class Encoder(nn.Module):
         audio_out = audio_out.reshape(bs, -1)
 
         class_bias = self.classbias[class_id]                  #bs latent_size
-        x_in = torch.cat([ref, pose_emb, audio_out, class_bias], dim=-1) #bs seq_len*(audio_emb_out_size+6)+latent_size
+        x_in = torch.cat([pose, pose_emb, audio_out, class_bias], dim=-1) #bs seq_len*(audio_emb_out_size+6)+latent_size
         x_out = self.MLP(x_in)
 
         mu = self.linear_means(x_out)
@@ -140,16 +140,17 @@ class Decoder(nn.Module):
         self.classbias = nn.Parameter(torch.randn(self.num_classes, latent_size))
 
     def forward(self, batch):
-        # (Pdb) for k, v in batch.items(): print('  ' + k + '.size():', list(v.size()))
-        #   ref.size(): [1, 6]
-        #   class.size(): [1]
-        #   z.size(): [1, 64]
-        #   audio_emb.size(): [1, 32, 512]
-
+        # debug_var("Decoder.batch", batch)
+        # Decoder.batch is dict:
+        #     tensor pose size: [1, 6] , min: tensor(-0.0195, device='cuda:0') , max: tensor(0.2540, device='cuda:0')
+        #     tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
+        #     tensor z size: [1, 64] , min: tensor(-2.7728, device='cuda:0') , max: tensor(1.7963, device='cuda:0')
+        #     tensor audio_emb size: [1, 32, 512] , min: tensor(0., device='cuda:0') , max: tensor(8.4478, device='cuda:0')
+        
         z = batch['z']                                          #bs latent_size
         bs = z.shape[0]
         class_id = batch['class']
-        ref = batch['ref']                             #bs 6
+        pose = batch['pose']                             #bs 6
         audio_in = batch['audio_emb']                           # bs seq_len audio_emb_in_size
 
         audio_out = self.linear_audio(audio_in)                 # bs seq_len audio_emb_out_size
@@ -157,7 +158,7 @@ class Decoder(nn.Module):
         class_bias = self.classbias[class_id]                   #bs latent_size
 
         z = z + class_bias
-        x_in = torch.cat([ref, z, audio_out], dim=-1)
+        x_in = torch.cat([pose, z, audio_out], dim=-1)
         x_out = self.MLP(x_in)                                  # bs layer_sizes[-1]
         x_out = x_out.reshape((bs, self.seq_len, -1))
 
@@ -165,10 +166,13 @@ class Decoder(nn.Module):
 
         pose_motion_pred = self.pose_linear(pose_emb.squeeze(1))       #bs seq_len 6
 
-        batch.update({'pose_motion_pred':pose_motion_pred})
+        batch.update({'pose_motion_pred':pose_motion_pred}) # size() -- [1, 32, 6]
 
-        # (Pdb) for k, v in batch.items(): print('  ' + k + '.size():', list(v.size()))
-        #   ...
-        #   pose_motion_pred.size(): [1, 32, 6]
+        # debug_var("Decoder.batch", batch)
+        # Decoder.batch is dict:
+        #     tensor pose size: [1, 6] , min: tensor(-0.0195, device='cuda:0') , max: tensor(0.2540, device='cuda:0')
+        #     tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
+        #     tensor z size: [1, 64] , min: tensor(-2.7728, device='cuda:0') , max: tensor(1.7963, device='cuda:0')
+        #     tensor audio_emb size: [1, 32, 512] , min: tensor(0., device='cuda:0') , max: tensor(8.4478, device='cuda:0')
 
         return batch

@@ -80,7 +80,7 @@ class SadTalker():
             print(use_ref_video, ref_info)
             assert use_ref_video == True and ref_info == 'all'
 
-        if use_ref_video and ref_info == 'all': # full ref mode
+        if use_ref_video and ref_info == 'all': # full reference mode
             ref_video_videoname = os.path.basename(ref_video)
             audio_path = os.path.join(save_dir, ref_video_videoname+'.wav')
             print('new audiopath:',audio_path)
@@ -93,13 +93,13 @@ class SadTalker():
         #crop image and extract 3dmm from image
         first_frame_dir = os.path.join(save_dir, 'first_frame_dir')
         os.makedirs(first_frame_dir, exist_ok=True)
-        first_coeff_path, crop_pic_path, crop_info = self.preprocess_model.generate(pic_path, first_frame_dir, preprocess, True, size)
+        image_coeff_path, crop_pic_path, crop_info = self.preprocess_model.generate(pic_path, first_frame_dir, preprocess, True, size)
         
-        if first_coeff_path is None:
+        if image_coeff_path is None:
             raise AttributeError("No face is detected")
 
         if use_ref_video:
-            print('using ref video for genreation')
+            print('using reference video for genreation')
             ref_video_videoname = os.path.splitext(os.path.split(ref_video)[-1])[0]
             ref_video_frame_dir = os.path.join(save_dir, ref_video_videoname)
             os.makedirs(ref_video_frame_dir, exist_ok=True)
@@ -131,11 +131,11 @@ class SadTalker():
         if use_ref_video and ref_info == 'all':
             coeff_path = ref_video_coeff_path # self.audio_to_coeff.generate(batch, save_dir, pose_style, ref_pose_coeff_path)
         else:
-            batch = get_data(first_coeff_path, audio_path, self.device, ref_eyeblink_coeff_path=ref_eyeblink_coeff_path, still=still_mode, idlemode=use_idle_mode, length_of_audio=length_of_audio, use_blink=use_blink) # longer audio?
+            batch = get_data(image_coeff_path, audio_path, self.device, ref_eyeblink_coeff_path=ref_eyeblink_coeff_path, still=still_mode, idlemode=use_idle_mode, length_of_audio=length_of_audio, use_blink=use_blink) # longer audio?
             coeff_path = self.audio_to_coeff.generate(batch, save_dir, pose_style, ref_pose_coeff_path)
 
         #coeff2video
-        data = get_facerender_data(coeff_path, crop_pic_path, first_coeff_path, audio_path, batch_size, still_mode=still_mode, preprocess=preprocess, size=size, expression_scale = exp_scale)
+        data = get_facerender_data(coeff_path, crop_pic_path, image_coeff_path, audio_path, batch_size, still_mode=still_mode, preprocess=preprocess, size=size, expression_scale = exp_scale)
         return_path = self.animate_from_coeff.generate(data, save_dir,  pic_path, crop_info, enhancer='gfpgan' if use_enhancer else None, preprocess=preprocess, img_size=size)
         video_name = data['video_name']
         print(f'The generated video is named {video_name} in {save_dir}')

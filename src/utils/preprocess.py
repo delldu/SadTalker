@@ -53,12 +53,12 @@ class CropAndExtract(): # xxxx8888
 
         self.device = device
     
-    def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
-        pic_name = os.path.splitext(os.path.split(input_path)[-1])[0]  
+    def generate_from_image(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
+        image_name = os.path.splitext(os.path.split(input_path)[-1])[0]  
 
-        landmarks_path =  os.path.join(save_dir, pic_name+'_landmarks.txt') 
-        coeff_path =  os.path.join(save_dir, pic_name+'.mat')  
-        png_path =  os.path.join(save_dir, pic_name+'.png')  
+        landmarks_path =  os.path.join(save_dir, image_name+'_landmarks.txt') 
+        image_coeff_path =  os.path.join(save_dir, image_name+'.mat')  
+        png_path =  os.path.join(save_dir, image_name+'.png')  
 
         #load input
         if not os.path.isfile(input_path):
@@ -119,7 +119,7 @@ class CropAndExtract(): # xxxx8888
             lm = np.loadtxt(landmarks_path).astype(np.float32)
             lm = lm.reshape([len(x_full_frames), -1, 2])
 
-        if not os.path.isfile(coeff_path):
+        if not os.path.isfile(image_coeff_path):
             # load 3dmm paramter generator from Deep3DFaceRecon_pytorch 
             video_coeffs, full_coeffs = [],  []
             for idx in tqdm(range(len(frames_pil)), desc='3DMM Extraction In Video:'):
@@ -168,7 +168,7 @@ class CropAndExtract(): # xxxx8888
                 full_coeffs.append(full_coeff.cpu().numpy()) # useless
 
             semantic_npy = np.array(video_coeffs)[:, 0] 
+            image_coeff_dict = {'coeff_3dmm': semantic_npy, 'full_3dmm': np.array(full_coeffs)[0]}
+            savemat(image_coeff_path, image_coeff_dict)
 
-            savemat(coeff_path, {'coeff_3dmm': semantic_npy, 'full_3dmm': np.array(full_coeffs)[0]})
-
-        return coeff_path, png_path, crop_info
+        return image_coeff_path, png_path, crop_info

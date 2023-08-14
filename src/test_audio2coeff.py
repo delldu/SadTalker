@@ -8,9 +8,10 @@ import safetensors
 import safetensors.torch 
 
 from src.audio2pose_models.audio2pose import Audio2Pose
-from src.audio2exp_models.networks import SimpleWrapperV2 
 from src.audio2exp_models.audio2exp import Audio2Exp
-from src.utils.safetensor_helper import load_x_from_safetensor  
+from src.utils.safetensor_helper import load_x_from_safetensor
+from src.utils.debug import debug_var
+
 import pdb
 
 
@@ -34,43 +35,33 @@ class Audio2Coeff(): # xxxx8888
         except:
             raise Exception("Failed in loading audio2pose_checkpoint")
 
-        # load audio2exp_model
-        netG = SimpleWrapperV2()
-        netG = netG.to(device)
-        for param in netG.parameters():
-            netG.requires_grad = False
-        netG.eval()
-        try:
-            checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
-            netG.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2exp'))
-        except:
-            raise Exception("Failed in loading audio2exp_checkpoint")
-
-        self.audio2exp_model = Audio2Exp(netG, device=device)
+        self.audio2exp_model = Audio2Exp(device=device)
         self.audio2exp_model = self.audio2exp_model.to(device)
         for param in self.audio2exp_model.parameters():
             param.requires_grad = False
         self.audio2exp_model.eval()
+        try:
+            checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
+            self.audio2exp_model.netG.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2exp'))
+        except:
+            raise Exception("Failed in loading audio2exp_checkpoint")
 
-        # xxxx8888
- 
         self.device = device
 
     def generate(self, batch, coeff_save_dir, pose_style):
-        # batch --
-        # {   'indiv_mels': indiv_mels,  # len() -- 1, indiv_mels[0].size() -- [200, 1, 80, 16]
-        #     'ref': ref_coeff,  # size() -- [1, 200, 70]
-        #     'num_frames': num_frames, # -- 200
-        #     'ratio_gt': ratio, # [1, 200, 1], 
-        #     'audio_name': audio_name, # 'chinese_news'
-        #     'pic_name': pic_name, # 'dell'
-        # }
+        # debug_var("Audio2Coeff.batch", batch)
+        # Audio2Coeff.batch is dict:
+        #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
+        #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
+        #     audio_num_frames value: 200
+        #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
+        #     audio_name value: 'chinese_news'
+        #     image_name value: 'dell'
 
         with torch.no_grad():
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             results_dict_exp= self.audio2exp_model(batch)
-            exp_pred = results_dict_exp['exp_coeff_pred']                         #bs T 64
-            # exp_pred.size() -- [1, 200, 64]
+            exp_pred = results_dict_exp['exp_coeff_pred'] # exp_pred.size() -- [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             #for class_id in  range(1):
@@ -80,8 +71,7 @@ class Audio2Coeff(): # xxxx8888
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             results_dict_pose = self.audio2pose_model(batch) 
-            pose_pred = results_dict_pose['pose_pred']                        #bs T 6
-            # results_dict_pose['pose_pred'].size() -- [1, 200, 6]
+            pose_pred = results_dict_pose['pose_pred'] # size() -- [1, 200, 6]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             pose_len = pose_pred.shape[1]
@@ -99,8 +89,8 @@ class Audio2Coeff(): # xxxx8888
             coeffs_pred_numpy = coeffs_pred[0].clone().detach().cpu().numpy() 
             # coeffs_pred_numpy.shape -- (200, 70)
 
-            savemat(os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['pic_name'], batch['audio_name'])),  
+            savemat(os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['image_name'], batch['audio_name'])),  
                     {'coeff_3dmm': coeffs_pred_numpy})
 
-            return os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['pic_name'], batch['audio_name']))
+            return os.path.join(coeff_save_dir, '%s##%s.mat'%(batch['image_name'], batch['audio_name']))
     

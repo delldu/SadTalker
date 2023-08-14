@@ -13,9 +13,10 @@ from src.facerender.modules.mapping import MappingNet
 from src.facerender.modules.generator import OcclusionAwareSPADEGenerator
 from src.facerender.modules.make_animation import make_animation 
 
-from pydub import AudioSegment 
+from pydub import AudioSegment  # xxxx8888
 from src.utils.paste_pic import paste_pic
 from src.utils.videoio import save_video_with_watermark
+from src.utils.debug import debug_var
 
 import pdb
 try:
@@ -87,20 +88,27 @@ class AnimateFromCoeff():
         # pic_path = 'examples/source_image/dell.png'
         # crop_info = ((351, 350), (0, 0, 353, 353), [1.6023768164683942, 0, 352.55072987298473, 350.24273121575817])
 
-        # for k, v in x.items(): print('  ' + k + '.size():', list(v.size()) if not isinstance(v, int|list) else v) 
+        # debug_var("AnimateFromCoeff.x", x)
+        # AnimateFromCoeff.x is dict:
+        #     tensor source_image size: [2, 3, 256, 256] , min: tensor(0.1216) , max: tensor(1.)
+        #     tensor source_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
+        #     audio_frame_num value: 200
+        #     tensor target_semantics size: [2, 100, 70, 27] , min: tensor(-1.6407) , max: tensor(1.0894)
+        #     video_name value: 'dell##chinese_news'
+        #     audio_path value: 'examples/driven_audio/chinese_news.wav'
 
         source_image=x['source_image'].to(self.device) # size() -- [2, 3, 256, 256]
         source_semantics=x['source_semantics'].to(self.device)  # size() -- [2, 70, 27]
         target_semantics=x['target_semantics'].to(self.device)  # size() -- [2, 100, 70, 27]
         
-        frame_num = x['frame_num'] # 200
+        audio_frame_num = x['audio_frame_num'] # 200
 
         predictions_video = make_animation(source_image, source_semantics, target_semantics,
                                         self.generator, self.kp_extractor, self.mapping)
         # predictions_video.size() -- [2, 100, 3, 256, 256]
 
         predictions_video = predictions_video.reshape((-1,) + predictions_video.shape[2:])
-        predictions_video = predictions_video[:frame_num]
+        predictions_video = predictions_video[:audio_frame_num]
 
         video = []
         for idx in range(predictions_video.shape[0]):
@@ -133,7 +141,7 @@ class AnimateFromCoeff():
         start_time = 0
         # cog will not keep the .mp3 filename
         sound = AudioSegment.from_file(audio_path)
-        frames = frame_num 
+        frames = audio_frame_num 
         end_time = start_time + frames*1/25*1000
         word1 = sound.set_frame_rate(16000)
         word = word1[start_time:end_time]

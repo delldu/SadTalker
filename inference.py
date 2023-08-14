@@ -39,24 +39,38 @@ def main(args):
     first_frame_dir = os.path.join(save_dir, 'first_frame_dir')
     os.makedirs(first_frame_dir, exist_ok=True)
     print('3DMM Extraction for source image')
-    first_coeff_path, crop_pic_path, crop_info = preprocess_model.generate(
+    image_coeff_path, crop_pic_path, crop_info = preprocess_model.generate_from_image(
             pic_path, first_frame_dir, args.preprocess, 
             source_image_flag=True, pic_size=args.size)
 
-    if first_coeff_path is None:
+    if image_coeff_path is None:
         print("Can't get the coeffs of the input")
         return
 
     #audio2ceoff
-    batch = get_data(first_coeff_path, audio_path, device)
-    debug_var("audio2ceoff.batch", batch)
+    batch = get_data(image_coeff_path, audio_path, device)
+    # debug_var("audio2ceoff.batch", batch)
+    # audio2ceoff.batch is dict:
+    #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
+    #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
+    #     audio_num_frames value: 200
+    #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
+    #     audio_name value: 'chinese_news'
+    #     image_name value: 'dell'
 
     coeff_path = audio_to_coeff.generate(batch, save_dir, pose_style)
 
     #coeff2video
-    data = get_facerender_data(coeff_path, crop_pic_path, first_coeff_path, audio_path, batch_size,
+    data = get_facerender_data(coeff_path, crop_pic_path, image_coeff_path, audio_path, batch_size,
                 expression_scale=args.expression_scale, preprocess=args.preprocess, size=args.size)
-    debug_var("coeff2video.data", data)
+    # debug_var("coeff2video.data", data)
+    # coeff2video.data is dict:
+    #     tensor source_image size: [2, 3, 256, 256] , min: tensor(0.1216) , max: tensor(1.)
+    #     tensor source_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
+    #     audio_frame_num value: 200
+    #     tensor target_semantics size: [2, 100, 70, 27] , min: tensor(-1.5285) , max: tensor(1.0894)
+    #     video_name value: 'dell##chinese_news'
+    #     audio_path value: 'examples/driven_audio/chinese_news.wav'
     
     result = animate_from_coeff.generate(data, save_dir, pic_path, crop_info, 
                 preprocess=args.preprocess, img_size=args.size)
