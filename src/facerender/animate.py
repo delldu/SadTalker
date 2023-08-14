@@ -27,35 +27,29 @@ except:
 class AnimateFromCoeff():
 
     def __init__(self, sadtalker_path, device):
-        generator = OcclusionAwareSPADEGenerator()
-        kp_extractor = KPDetector()
-        mapping = MappingNet()
+        self.device = device
 
-        generator.to(device)
-        kp_extractor.to(device)
-        mapping.to(device)
-        for param in generator.parameters():
+        self.generator = OcclusionAwareSPADEGenerator().to(device)
+        self.generator.eval()
+
+        self.kp_extractor = KPDetector().to(device)
+        self.kp_extractor.eval()
+
+        self.mapping = MappingNet().to(device)
+        self.mapping.eval()
+
+        for param in self.generator.parameters():
             param.requires_grad = False
-        for param in kp_extractor.parameters():
+        for param in self.kp_extractor.parameters():
             param.requires_grad = False 
-        for param in mapping.parameters():
+        for param in self.mapping.parameters():
             param.requires_grad = False
 
         self.load_cpk_facevid2vid_safetensor(sadtalker_path['checkpoint'],
-                kp_detector=kp_extractor, generator=generator)
+                kp_detector=self.kp_extractor, generator=self.generator)
 
         # sadtalker_path['mappingnet_checkpoint'] -- './checkpoints/mapping_00229-model.pth.tar'
-        self.load_cpk_mapping(sadtalker_path['mappingnet_checkpoint'], mapping=mapping)
-
-        self.kp_extractor = kp_extractor
-        self.generator = generator
-        self.mapping = mapping
-
-        self.kp_extractor.eval()
-        self.generator.eval()
-        self.mapping.eval()
-         
-        self.device = device
+        self.load_cpk_mapping(sadtalker_path['mappingnet_checkpoint'], mapping=self.mapping)
     
 
     def load_cpk_facevid2vid_safetensor(self, checkpoint_path, generator=None, 
@@ -78,8 +72,6 @@ class AnimateFromCoeff():
                 x_generator[k.replace('kp_extractor.', '')] = v
         kp_detector.load_state_dict(x_generator)
         
-        return None
-
 
     def load_cpk_mapping(self, checkpoint_path, mapping, device='cpu'):
         # checkpoint_path = './checkpoints/mapping_00229-model.pth.tar'
@@ -95,22 +87,19 @@ class AnimateFromCoeff():
         # pic_path = 'examples/source_image/dell.png'
         # crop_info = ((351, 350), (0, 0, 353, 353), [1.6023768164683942, 0, 352.55072987298473, 350.24273121575817])
 
-        source_image=x['source_image'].type(torch.FloatTensor)
-        source_semantics=x['source_semantics'].type(torch.FloatTensor)
-        target_semantics=x['target_semantics_list'].type(torch.FloatTensor) # xxxx8888, key word: target_semantics_list
-        source_image=source_image.to(self.device) # size() -- [2, 3, 256, 256]
-        
-        source_semantics=source_semantics.to(self.device)  # size() -- [2, 70, 27]
-        target_semantics=target_semantics.to(self.device)  # size() -- [2, 100, 70, 27] # # xxxx8888
+        # for k, v in x.items(): print('  ' + k + '.size():', list(v.size()) if not isinstance(v, int|list) else v) 
 
+        source_image=x['source_image'].to(self.device) # size() -- [2, 3, 256, 256]
+        source_semantics=x['source_semantics'].to(self.device)  # size() -- [2, 70, 27]
+        target_semantics=x['target_semantics'].to(self.device)  # size() -- [2, 100, 70, 27]
+        
         frame_num = x['frame_num'] # 200
 
         predictions_video = make_animation(source_image, source_semantics, target_semantics,
-                                        self.generator, self.kp_extractor, self.mapping, 
-                                        )
+                                        self.generator, self.kp_extractor, self.mapping)
         # predictions_video.size() -- [2, 100, 3, 256, 256]
 
-        predictions_video = predictions_video.reshape((-1,)+predictions_video.shape[2:])
+        predictions_video = predictions_video.reshape((-1,) + predictions_video.shape[2:])
         predictions_video = predictions_video[:frame_num]
 
         video = []

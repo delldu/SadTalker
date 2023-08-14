@@ -79,7 +79,7 @@ def get_facerender_data(coeff_path, pic_path, first_coeff_path, audio_path, batc
     target_semantics_np = np.array(target_semantics_list) #frame_num 70 semantic_radius*2+1
     target_semantics_np = target_semantics_np.reshape(batch_size, -1, 
                                 target_semantics_np.shape[-2], target_semantics_np.shape[-1])
-    data['target_semantics_list'] = torch.FloatTensor(target_semantics_np) # size() -- [2, 100, 70, 27]
+    data['target_semantics'] = torch.FloatTensor(target_semantics_np) # size() -- [2, 100, 70, 27]
     data['video_name'] = video_name # 'dell##chinese_news'
     data['audio_path'] = audio_path # 'examples/driven_audio/chinese_news.wav'
 

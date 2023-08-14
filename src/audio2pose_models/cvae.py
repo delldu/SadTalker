@@ -40,25 +40,26 @@ class CVAE(nn.Module):
 
         self.latent_size = latent_size
 
-        self.encoder = ENCODER(encoder_layer_sizes, latent_size, num_classes,
+        # xxxx9999
+        self.encoder = Encoder(encoder_layer_sizes, latent_size, num_classes,
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
-        self.decoder = DECODER(decoder_layer_sizes, latent_size, num_classes,
+        self.decoder = Decoder(decoder_layer_sizes, latent_size, num_classes,
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
 
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+    # def reparameterize(self, mu, logvar):
+    #     std = torch.exp(0.5 * logvar)
+    #     eps = torch.randn_like(std)
+    #     return mu + eps * std
+
+    # def forward(self, batch):
+    #     batch = self.encoder(batch)
+    #     mu = batch['mu']
+    #     logvar = batch['logvar']
+    #     z = self.reparameterize(mu, logvar)
+    #     batch['z'] = z
+    #     return self.decoder(batch)
 
     def forward(self, batch):
-        batch = self.encoder(batch)
-        mu = batch['mu']
-        logvar = batch['logvar']
-        z = self.reparameterize(mu, logvar)
-        batch['z'] = z
-        return self.decoder(batch)
-
-    def test(self, batch):
         '''
         class_id = batch['class']
         z = torch.randn([class_id.size(0), self.latent_size]).to(class_id.device)
@@ -66,7 +67,7 @@ class CVAE(nn.Module):
         '''
         return self.decoder(batch)
 
-class ENCODER(nn.Module):
+class Encoder(nn.Module):
     def __init__(self, layer_sizes, latent_size, num_classes, 
                 audio_emb_in_size, audio_emb_out_size, seq_len):
         super().__init__()
@@ -114,7 +115,7 @@ class ENCODER(nn.Module):
         batch.update({'mu':mu, 'logvar':logvar})
         return batch
 
-class DECODER(nn.Module):
+class Decoder(nn.Module):
     def __init__(self, layer_sizes, latent_size, num_classes, 
                 audio_emb_in_size, audio_emb_out_size, seq_len):
         super().__init__()
@@ -139,16 +140,19 @@ class DECODER(nn.Module):
         self.classbias = nn.Parameter(torch.randn(self.num_classes, latent_size))
 
     def forward(self, batch):
+        # (Pdb) for k, v in batch.items(): print('  ' + k + '.size():', list(v.size()))
+        #   ref.size(): [1, 6]
+        #   class.size(): [1]
+        #   z.size(): [1, 64]
+        #   audio_emb.size(): [1, 32, 512]
 
         z = batch['z']                                          #bs latent_size
         bs = z.shape[0]
         class_id = batch['class']
         ref = batch['ref']                             #bs 6
         audio_in = batch['audio_emb']                           # bs seq_len audio_emb_in_size
-        #print('audio_in: ', audio_in[:, :, :10])
 
         audio_out = self.linear_audio(audio_in)                 # bs seq_len audio_emb_out_size
-        #print('audio_out: ', audio_out[:, :, :10])
         audio_out = audio_out.reshape([bs, -1])                 # bs seq_len*audio_emb_out_size
         class_bias = self.classbias[class_id]                   #bs latent_size
 
@@ -157,11 +161,14 @@ class DECODER(nn.Module):
         x_out = self.MLP(x_in)                                  # bs layer_sizes[-1]
         x_out = x_out.reshape((bs, self.seq_len, -1))
 
-        #print('x_out: ', x_out)
-
         pose_emb = self.resunet(x_out.unsqueeze(1))             #bs 1 seq_len 6
 
         pose_motion_pred = self.pose_linear(pose_emb.squeeze(1))       #bs seq_len 6
 
         batch.update({'pose_motion_pred':pose_motion_pred})
+
+        # (Pdb) for k, v in batch.items(): print('  ' + k + '.size():', list(v.size()))
+        #   ...
+        #   pose_motion_pred.size(): [1, 32, 6]
+
         return batch

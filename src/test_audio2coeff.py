@@ -13,16 +13,6 @@ from src.audio2exp_models.audio2exp import Audio2Exp
 from src.utils.safetensor_helper import load_x_from_safetensor  
 import pdb
 
-def load_cpk(checkpoint_path, model=None, optimizer=None, device="cpu"):
-    checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
-    if model is not None:
-        model.load_state_dict(checkpoint['model'])
-    if optimizer is not None:
-        optimizer.load_state_dict(checkpoint['optimizer'])
-
-    pdb.set_trace()
-    
-    return checkpoint['epoch']
 
 class Audio2Coeff(): # xxxx8888
     '''
@@ -30,10 +20,6 @@ class Audio2Coeff(): # xxxx8888
     '''
 
     def __init__(self, sadtalker_path, device):
-        #load config
-        # sadtalker_path['audio2pose_yaml_path'] -- 'src/config/auido2pose.yaml'
-        # sadtalker_path['audio2exp_yaml_path'] -- 'src/config/auido2exp.yaml'
-
         # load audio2pose_model
         self.audio2pose_model = Audio2Pose(device=device)
         self.audio2pose_model = self.audio2pose_model.to(device)
@@ -42,12 +28,9 @@ class Audio2Coeff(): # xxxx8888
             param.requires_grad = False 
         
         try:
-            if sadtalker_path['use_safetensor']:
-                # './checkpoints/SadTalker_V0.0.2_256.safetensors'
-                checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
-                self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose'))
-            else:
-                load_cpk(sadtalker_path['audio2pose_checkpoint'], model=self.audio2pose_model, device=device)
+            # './checkpoints/SadTalker_V0.0.2_256.safetensors'
+            checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
+            self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose'))
         except:
             raise Exception("Failed in loading audio2pose_checkpoint")
 
@@ -58,11 +41,8 @@ class Audio2Coeff(): # xxxx8888
             netG.requires_grad = False
         netG.eval()
         try:
-            if sadtalker_path['use_safetensor']:
-                checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
-                netG.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2exp'))
-            else:
-                load_cpk(sadtalker_path['audio2exp_checkpoint'], model=netG, device=device)
+            checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
+            netG.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2exp'))
         except:
             raise Exception("Failed in loading audio2exp_checkpoint")
 
@@ -77,13 +57,20 @@ class Audio2Coeff(): # xxxx8888
         self.device = device
 
     def generate(self, batch, coeff_save_dir, pose_style):
+        # batch --
+        # {   'indiv_mels': indiv_mels,  # len() -- 1, indiv_mels[0].size() -- [200, 1, 80, 16]
+        #     'ref': ref_coeff,  # size() -- [1, 200, 70]
+        #     'num_frames': num_frames, # -- 200
+        #     'ratio_gt': ratio, # [1, 200, 1], 
+        #     'audio_name': audio_name, # 'chinese_news'
+        #     'pic_name': pic_name, # 'dell'
+        # }
 
         with torch.no_grad():
-            #test
-
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             results_dict_exp= self.audio2exp_model(batch)
             exp_pred = results_dict_exp['exp_coeff_pred']                         #bs T 64
+            # exp_pred.size() -- [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             #for class_id in  range(1):
@@ -103,9 +90,9 @@ class Audio2Coeff(): # xxxx8888
                 pose_pred = torch.Tensor(savgol_filter(np.array(pose_pred.cpu()), pose_len, 2, axis=1)).to(self.device)
             else:
                 pose_pred = torch.Tensor(savgol_filter(np.array(pose_pred.cpu()), 13, 2, axis=1)).to(self.device) 
-            # pose_pred.size() -- [1, 200, 6]
-            # exp_pred.size() -- [1, 200, 64]
 
+            # exp_pred.size() -- [1, 200, 64]
+            # pose_pred.size() -- [1, 200, 6]
             coeffs_pred = torch.cat((exp_pred, pose_pred), dim=-1)            #bs T 70
             # ==> coeffs_pred.size() -- [1, 200, 70]
 
