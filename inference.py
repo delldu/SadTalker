@@ -11,6 +11,7 @@ from src.facerender.animate import AnimateFromCoeff
 from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
 from src.utils.init_path import init_path
+from src.utils.debug import debug_var
 import pdb
 
 def main(args):
@@ -48,11 +49,14 @@ def main(args):
 
     #audio2ceoff
     batch = get_data(first_coeff_path, audio_path, device)
+    debug_var("audio2ceoff.batch", batch)
+
     coeff_path = audio_to_coeff.generate(batch, save_dir, pose_style)
 
     #coeff2video
     data = get_facerender_data(coeff_path, crop_pic_path, first_coeff_path, audio_path, batch_size,
                 expression_scale=args.expression_scale, preprocess=args.preprocess, size=args.size)
+    debug_var("coeff2video.data", data)
     
     result = animate_from_coeff.generate(data, save_dir, pic_path, crop_info, 
                 preprocess=args.preprocess, img_size=args.size)

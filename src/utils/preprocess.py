@@ -54,7 +54,6 @@ class CropAndExtract(): # xxxx8888
         self.device = device
     
     def generate(self, input_path, save_dir, crop_or_resize='crop', source_image_flag=False, pic_size=256):
-
         pic_name = os.path.splitext(os.path.split(input_path)[-1])[0]  
 
         landmarks_path =  os.path.join(save_dir, pic_name+'_landmarks.txt') 
