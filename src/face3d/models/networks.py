@@ -13,18 +13,16 @@ except ImportError:
 from typing import Type, Any, Callable, Union, List, Optional
 
 
-def filter_state_dict(state_dict, remove_name='fc'):
-    new_state_dict = {}
-    for key in state_dict:
-        if remove_name in key:
-            continue
-        new_state_dict[key] = state_dict[key]
-    return new_state_dict
-
-def define_net_recon(net_recon, use_last_fc=False, init_path=None):
-    return ImageCoeffModel(net_recon, use_last_fc=use_last_fc, init_path=init_path)
+# def filter_state_dict(state_dict, remove_name='fc'):
+#     new_state_dict = {}
+#     for key in state_dict:
+#         if remove_name in key:
+#             continue
+#         new_state_dict[key] = state_dict[key]
+#     return new_state_dict
 
 
+# xxxx8888 *************************************************************************
 class ImageCoeffModel(nn.Module):
     fc_dim=257
     def __init__(self, net_recon, use_last_fc=False, init_path=None):
@@ -34,10 +32,10 @@ class ImageCoeffModel(nn.Module):
             return  NotImplementedError('network [%s] is not implemented', net_recon)
         func, last_dim = func_dict[net_recon]
         backbone = func(use_last_fc=use_last_fc, num_classes=self.fc_dim)
-        if init_path and os.path.isfile(init_path):
-            state_dict = filter_state_dict(torch.load(init_path, map_location='cpu'))
-            backbone.load_state_dict(state_dict)
-            print("loading init net_recon %s from %s" %(net_recon, init_path))
+        # if init_path and os.path.isfile(init_path):
+        #     state_dict = filter_state_dict(torch.load(init_path, map_location='cpu'))
+        #     backbone.load_state_dict(state_dict)
+        #     print("loading init net_recon %s from %s" %(net_recon, init_path))
         self.backbone = backbone
         if not use_last_fc: # True
             self.final_layers = nn.ModuleList([

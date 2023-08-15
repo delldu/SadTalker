@@ -421,10 +421,8 @@ class AntiAliasInterpolation2d(nn.Module):
 class SPADE(nn.Module):
     def __init__(self, norm_nc, label_nc):
         super().__init__()
-
-        self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
         nhidden = 128
-
+        self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
         self.mlp_shared = nn.Sequential(
             nn.Conv2d(label_nc, nhidden, kernel_size=3, padding=1),
             nn.ReLU())
@@ -442,12 +440,11 @@ class SPADE(nn.Module):
     
 
 class SPADEResnetBlock(nn.Module):
-    def __init__(self, fin, fout, norm_G, label_nc, use_se=False, dilation=1):
+    def __init__(self, fin, fout, norm_G, label_nc, dilation=1):
         super().__init__()
         # Attributes
         self.learned_shortcut = (fin != fout)
         fmiddle = min(fin, fout)
-        self.use_se = use_se
         # create conv layers
         self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=dilation, dilation=dilation)
         self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=dilation, dilation=dilation)

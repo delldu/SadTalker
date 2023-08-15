@@ -14,8 +14,9 @@ from src.utils.debug import debug_var
 
 import pdb
 
+# xxxx8888 *************************************************************************
 # AudioCoeffModel
-class Audio2Coeff(): # xxxx8888
+class Audio2Coeff():
     '''
         ==> (200, 70) --70 = pose(6) + exp(64)
     '''

@@ -11,8 +11,8 @@ class SPADEDecoder(nn.Module):
         super().__init__()
         ic = 256
         oc = 64
-        norm_G = 'spadespectralinstance'
         label_nc = 256
+        norm_G = 'spadespectralinstance'
         
         self.fc = nn.Conv2d(ic, 2 * ic, 3, padding=1)
         self.G_middle_0 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
@@ -41,12 +41,12 @@ class SPADEDecoder(nn.Module):
         x = self.up_1(x, seg)         # 64, 256, 256
 
         x = self.conv_img(F.leaky_relu(x, 2e-1))
-        # x = torch.tanh(x)
         x = F.sigmoid(x)
         
         return x
 
-
+# comes from "first order motion" ?
+# xxxx8888 **********************************************
 class OcclusionAwareSPADEGenerator(nn.Module):
     '''
     src/config/facerender.yaml
@@ -126,6 +126,7 @@ class OcclusionAwareSPADEGenerator(nn.Module):
 
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # feature_3d.size() -- [2, 32, 16, 64, 64]
+        # dense_motion -- DenseMotionNetwork(...)
         dense_motion = self.dense_motion_network(feature=feature_3d, kp_driving=kp_driving,
                                                  kp_source=kp_source)
 

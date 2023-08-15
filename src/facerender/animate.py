@@ -25,6 +25,7 @@ try:
 except:
     in_webui = False
 
+# xxxx8888 *****************************************************
 class AnimateFromCoeff():
 
     def __init__(self, sadtalker_path, device):
@@ -133,22 +134,21 @@ class AnimateFromCoeff():
         av_path = os.path.join(video_save_dir, video_name)
         return_path = av_path 
         
-        audio_path =  x['audio_path'] # 'examples/driven_audio/chinese_news.wav'
+        audio_path = x['audio_path'] # 'examples/driven_audio/chinese_news.wav'
         audio_name = os.path.splitext(os.path.split(audio_path)[-1])[0]
-        # new_audio_path = os.path.join(video_save_dir, audio_name+'.wav')
-        # # './results/2023_08_13_10.45.38/chinese_news.wav'
+        new_audio_path = os.path.join(video_save_dir, audio_name+'.wav')
+        # './results/2023_08_13_10.45.38/chinese_news.wav'
 
-        # start_time = 0
-        # # cog will not keep the .mp3 filename
-        # sound = AudioSegment.from_file(audio_path)
-        # frames = audio_frame_num 
-        # end_time = start_time + frames*1/25*1000
-        # word1 = sound.set_frame_rate(16000)
-        # word = word1[start_time:end_time]
-        # word.export(new_audio_path, format="wav")
+        start_time = 0
+        # cog will not keep the .mp3 filename
+        sound = AudioSegment.from_file(audio_path)
+        frames = audio_frame_num 
+        end_time = start_time + frames*1/25*1000
+        word1 = sound.set_frame_rate(16000)
+        word = word1[start_time:end_time]
+        word.export(new_audio_path, format="wav")
 
-        # save_video_with_watermark(path, new_audio_path, av_path, watermark= False)
-        save_video_with_watermark(path, audio_path, av_path, watermark= False)
+        save_video_with_watermark(path, new_audio_path, av_path, watermark= False)
 
         print(f'The generated video is named {video_save_dir}/{video_name}') 
 
@@ -163,7 +163,7 @@ class AnimateFromCoeff():
             full_video_path = av_path 
 
             os.remove(path)
-        # os.remove(new_audio_path)
+        os.remove(new_audio_path)
 
         return return_path
 

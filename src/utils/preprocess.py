@@ -41,7 +41,7 @@ class CropAndExtract(): # xxxx8888
     def __init__(self, sadtalker_path, device):
 
         self.propress = Preprocesser(device)
-        self.net_recon = networks.define_net_recon(net_recon='resnet50', use_last_fc=False, init_path='').to(device)
+        self.net_recon = networks.ImageCoeffModel(net_recon='resnet50', use_last_fc=False, init_path='').to(device)
         
         # sadtalker_path['checkpoint'] -- './checkpoints/SadTalker_V0.0.2_256.safetensors'
         checkpoint = safetensors.torch.load_file(sadtalker_path['checkpoint'])    
