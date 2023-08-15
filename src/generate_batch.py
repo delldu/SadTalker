@@ -9,6 +9,7 @@ import src.utils.audio as audio
 from src.utils.debug import debug_var
 import pdb
 
+
 def crop_pad_audio(wav, audio_length):
     if len(wav) > audio_length:
         wav = wav[:audio_length]
@@ -49,24 +50,26 @@ def get_data(image_coeff_path, audio_path, device):
     image_name = os.path.splitext(os.path.split(image_coeff_path)[-1])[0]
     audio_name = os.path.splitext(os.path.split(audio_path)[-1])[0]
 
+
     wav = audio.load_wav(audio_path, 16000) 
     wav_length, audio_num_frames = parse_audio_length(len(wav), 16000, 25) # (128000, 200)
     wav = crop_pad_audio(wav, wav_length)
-    orig_mel = audio.melspectrogram(wav).T # orig_mel.shape -- (641, 80)
-    spec = orig_mel.copy()         # nframes 80
+    # array wav shape: (128000,) , min: -1.0112159 , max: 1.0876185
+
+    orig_mel = audio.melspectrogram(wav).T # orig_mel.shape -- (641, 80), xxxx8888 !!!
+    # array orig_mel shape: (641, 80) , min: -4.0 , max: 2.5998246882359766
+
+    torch_mel = audio.torch_melspectrogram(torch.from_numpy(wav)).T
+    debug_var("torch_mel", torch_mel)
+
     audio_mels = []
-
-    # (Pdb) type(wav) -- <class 'numpy.ndarray'>,  (Pdb) wav.shape -- (128000,)
-    # (Pdb) wav -- array([-0.00319423, -0.00569311, -0.00719347, ..., -0.14446567,
-    #        -0.16598062, -0.20840327], dtype=float32)
-
     for i in tqdm(range(audio_num_frames), 'mel:'):
         start_frame_num = i-2
         start_idx = int(80. * (start_frame_num / float(fps)))
         end_idx = start_idx + syncnet_mel_step_size
         seq = list(range(start_idx, end_idx))
         seq = [ min(max(item, 0), orig_mel.shape[0]-1) for item in seq ] # orig_mel.shape -- (641, 80)
-        m = spec[seq, :]
+        m = orig_mel[seq, :]
         audio_mels.append(m.T)
     audio_mels = np.asarray(audio_mels)         # T 80 16
     audio_mels = torch.FloatTensor(audio_mels).unsqueeze(1).unsqueeze(0) # bs T 1 80 16

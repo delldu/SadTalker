@@ -14,7 +14,7 @@ from src.utils.debug import debug_var
 
 import pdb
 
-
+# AudioCoeffModel
 class Audio2Coeff(): # xxxx8888
     '''
         ==> (200, 70) --70 = pose(6) + exp(64)
@@ -60,7 +60,7 @@ class Audio2Coeff(): # xxxx8888
 
         with torch.no_grad():
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            results_dict_exp= self.audio2exp_model(batch)
+            results_dict_exp= self.audio2exp_model(batch) # Audio2Exp(...)
             exp_pred = results_dict_exp['exp_coeff_pred'] # exp_pred.size() -- [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -70,10 +70,11 @@ class Audio2Coeff(): # xxxx8888
             batch['class'] = torch.LongTensor([pose_style]).to(self.device)
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            results_dict_pose = self.audio2pose_model(batch) 
+            results_dict_pose = self.audio2pose_model(batch) # Audio2Pose(...)
             pose_pred = results_dict_pose['pose_pred'] # size() -- [1, 200, 6]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+            # xxxx8888
             pose_len = pose_pred.shape[1]
             if pose_len<13: # False
                 pose_len = int((pose_len-1)/2)*2+1
@@ -83,7 +84,7 @@ class Audio2Coeff(): # xxxx8888
 
             # exp_pred.size() -- [1, 200, 64]
             # pose_pred.size() -- [1, 200, 6]
-            coeffs_pred = torch.cat((exp_pred, pose_pred), dim=-1)            #bs T 70
+            coeffs_pred = torch.cat((exp_pred, pose_pred), dim=-1)
             # ==> coeffs_pred.size() -- [1, 200, 70]
 
             coeffs_pred_numpy = coeffs_pred[0].clone().detach().cpu().numpy() 

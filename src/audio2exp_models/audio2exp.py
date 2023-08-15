@@ -95,6 +95,7 @@ class Audio2Exp(nn.Module):
             audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # self.netG -- Audio2ExpWrapperV2(...)
             curr_exp_coeff_pred  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 

@@ -10,10 +10,20 @@ import torch
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning) 
 warnings.filterwarnings("ignore", category=FutureWarning) 
-
+import pdb
 
 # calculating least square problem for image alignment
 def POS(xp, x):
+    # (Pdb) xp -- (2, 5)
+    # array([[ 96.06641 , 159.80469 , 125.92578 , 100.66016 , 155.78516 ],
+    #        [133.54688 , 132.78125 ,  96.796875,  66.171875,  66.171875]],
+    #       dtype=float32)
+    # (Pdb) x -- (3, 5)
+    # array([[-0.31148657,  0.30979887,  0.0032535 , -0.25216928,  0.2484662 ],
+    #        [ 0.29036078,  0.28972036, -0.04617932, -0.38133916, -0.38128236],
+    #        [ 0.13377953,  0.13179526,  0.55244243,  0.22405732,  0.22235769]],
+    #       dtype=float32)
+
     npts = xp.shape[1]
 
     A = np.zeros([2*npts, 8])
@@ -35,10 +45,23 @@ def POS(xp, x):
     s = (np.linalg.norm(R1) + np.linalg.norm(R2))/2
     t = np.stack([sTx, sTy], axis=0)
 
+    # (Pdb) pp s
+    # 102.41889718897251
+    # (Pdb) pp t
+    # array([[129.40619172],
+    #        [105.51237165]])
     return t, s
     
 # resize and crop images for face reconstruction
 def resize_n_crop_img(img, lm, t, s, target_size=224., mask=None):
+    # img -- <PIL.Image.Image image mode=RGB size=256x256 at 0x7F3ED5178130>
+    # lm.shape -- (68, 2)
+    # (Pdb) pp t
+    # array([[129.40619172],
+    #        [105.51237165]])
+    # (Pdb) pp s
+    # 0.9959099619262684
+
     w0, h0 = img.size
     w = (w0*s).astype(np.int32)
     h = (h0*s).astype(np.int32)
@@ -50,7 +73,7 @@ def resize_n_crop_img(img, lm, t, s, target_size=224., mask=None):
     img = img.resize((w, h), resample=Image.BICUBIC)
     img = img.crop((left, up, right, below))
 
-    if mask is not None:
+    if mask is not None: # False
         mask = mask.resize((w, h), resample=Image.BICUBIC)
         mask = mask.crop((left, up, right, below))
 
@@ -58,6 +81,8 @@ def resize_n_crop_img(img, lm, t, s, target_size=224., mask=None):
                   t[1] + h0/2], axis=1)*s
     lm = lm - np.reshape(
             np.array([(w/2 - target_size/2), (h/2-target_size/2)]), [1, 2])
+
+    # img -- <PIL.Image.Image image mode=RGB size=224x224 at 0x7F3ED5190670>
 
     return img, lm, mask
 

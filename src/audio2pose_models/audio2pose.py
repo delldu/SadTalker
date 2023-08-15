@@ -65,7 +65,7 @@ class Audio2Pose(nn.Module):
             batch['audio_emb'] = audio_emb
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            batch = self.netG(batch)
+            batch = self.netG(batch) # CVAE(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             pose_motion_pred_list.append(batch['pose_motion_pred'])  #list of bs seq_len 6
@@ -81,7 +81,7 @@ class Audio2Pose(nn.Module):
             batch['audio_emb'] = audio_emb
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            batch = self.netG(batch)
+            batch = self.netG(batch)  # CVAE(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             pose_motion_pred_list.append(batch['pose_motion_pred'][:,-1*re:,:])   

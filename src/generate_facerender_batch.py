@@ -39,15 +39,14 @@ def get_facerender_data(coeff_path, pic_path, image_coeff_path, audio_path, batc
     audio_coeff_dict = scio.loadmat(coeff_path)
     # audio_coeff_dict['coeff_3dmm'].shape -- (200, 70)
 
-    if 'full' not in preprocess.lower():
+    if 'full' not in preprocess.lower(): # True !!!
         source_semantics = image_coeff_dict['coeff_3dmm'][:1,:70] #1 70
         audio_exp_pose = audio_coeff_dict['coeff_3dmm'][:,:70]
-
-    else:
-        source_semantics = image_coeff_dict['coeff_3dmm'][:1,:73] #1 70
+    else: # full mode !!!
+        source_semantics = image_coeff_dict['coeff_3dmm'][:1,:73]
         audio_exp_pose = audio_coeff_dict['coeff_3dmm'][:,:70]
 
-    source_semantics_new = transform_semantic_1(source_semantics, semantic_radius)
+    source_semantics_new = transform_semantic(source_semantics, semantic_radius)
     source_semantics_ts = torch.FloatTensor(source_semantics_new).unsqueeze(0)
     source_semantics_ts = source_semantics_ts.repeat(batch_size, 1, 1)
     data['source_semantics'] = source_semantics_ts
@@ -94,7 +93,7 @@ def get_facerender_data(coeff_path, pic_path, image_coeff_path, audio_path, batc
 
     return data
 
-def transform_semantic_1(semantic, semantic_radius: int):
+def transform_semantic(semantic, semantic_radius: int):
     semantic_list =  [semantic for i in range(0, semantic_radius*2+1)]
     coeff_3dmm = np.concatenate(semantic_list, 0)
     return coeff_3dmm.transpose(1, 0)

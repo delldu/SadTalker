@@ -98,17 +98,17 @@ if __name__ == '__main__':
     parser.add_argument("--verbose",action="store_true", help="saving the intermedia output or not" ) 
 
     # net structure and parameters
-    parser.add_argument('--net_recon', type=str, default='resnet50', choices=['resnet18', 'resnet34', 'resnet50'], help='useless')
+    parser.add_argument('--net_recon', type=str, default='resnet50', choices=['resnet50'], help='useless')
     parser.add_argument('--use_last_fc',default=False, help='zero initialize the last fc')
     parser.add_argument('--bfm_folder', type=str, default='./checkpoints/BFM_Fitting/')
     parser.add_argument('--bfm_model', type=str, default='BFM_model_front.mat', help='bfm model')
 
     # default renderer parameters
-    parser.add_argument('--focal', type=float, default=1015.)
-    parser.add_argument('--center', type=float, default=112.)
-    parser.add_argument('--camera_d', type=float, default=10.)
-    parser.add_argument('--z_near', type=float, default=5.)
-    parser.add_argument('--z_far', type=float, default=15.)
+    # parser.add_argument('--focal', type=float, default=1015.)
+    # parser.add_argument('--center', type=float, default=112.)
+    # parser.add_argument('--camera_d', type=float, default=10.)
+    # parser.add_argument('--z_near', type=float, default=5.)
+    # parser.add_argument('--z_far', type=float, default=15.)
 
     args = parser.parse_args()
 

@@ -22,13 +22,13 @@ def filter_state_dict(state_dict, remove_name='fc'):
     return new_state_dict
 
 def define_net_recon(net_recon, use_last_fc=False, init_path=None):
-    return ReconNetWrapper(net_recon, use_last_fc=use_last_fc, init_path=init_path)
+    return ImageCoeffModel(net_recon, use_last_fc=use_last_fc, init_path=init_path)
 
 
-class ReconNetWrapper(nn.Module):
+class ImageCoeffModel(nn.Module):
     fc_dim=257
     def __init__(self, net_recon, use_last_fc=False, init_path=None):
-        super(ReconNetWrapper, self).__init__()
+        super(ImageCoeffModel, self).__init__()
         self.use_last_fc = use_last_fc
         if net_recon not in func_dict:
             return  NotImplementedError('network [%s] is not implemented', net_recon)
@@ -39,7 +39,7 @@ class ReconNetWrapper(nn.Module):
             backbone.load_state_dict(state_dict)
             print("loading init net_recon %s from %s" %(net_recon, init_path))
         self.backbone = backbone
-        if not use_last_fc:
+        if not use_last_fc: # True
             self.final_layers = nn.ModuleList([
                 conv1x1(last_dim, 80, bias=True), # id layer
                 conv1x1(last_dim, 64, bias=True), # exp layer
@@ -55,7 +55,7 @@ class ReconNetWrapper(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        if not self.use_last_fc:
+        if not self.use_last_fc: # True
             output = []
             for layer in self.final_layers:
                 output.append(layer(x))
