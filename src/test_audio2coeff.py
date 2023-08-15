@@ -32,7 +32,8 @@ class Audio2Coeff():
         try:
             # './checkpoints/SadTalker_V0.0.2_256.safetensors'
             checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
-            self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose'))
+            self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose', 
+                skip_key1='netG.encoder.', skip_key2='netD_motion.seq.'))
         except:
             raise Exception("Failed in loading audio2pose_checkpoint")
 

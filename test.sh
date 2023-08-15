@@ -1,4 +1,3 @@
 python inference.py \
 	--driven_audio examples/driven_audio/chinese_news.wav \
-	--source_image examples/source_image/dell.png \
-	--pose_style 45
+	--source_image examples/source_image/dell.png
