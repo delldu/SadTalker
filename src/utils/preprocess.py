@@ -142,7 +142,6 @@ class CropAndExtract(): # xxxx8888
                 # im1 -- <PIL.Image.Image image mode=RGB size=224x224>
                 # im_t.size() -- [1, 3, 224, 224]
 
-                # xxxx1111 image coeff model
                 with torch.no_grad():
                     full_coeff = self.net_recon(im_t) # ImageCoeffModel(...)
                     coeffs = split_coeff(full_coeff)

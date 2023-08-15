@@ -40,7 +40,6 @@ class CVAE(nn.Module):
 
         self.latent_size = latent_size
 
-        # xxxx9999
         self.encoder = Encoder(encoder_layer_sizes, latent_size, num_classes,
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
         self.decoder = Decoder(decoder_layer_sizes, latent_size, num_classes,

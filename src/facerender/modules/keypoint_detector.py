@@ -9,7 +9,7 @@ from src.facerender.modules.util import (
 )
 import pdb
 
-class KPDetector(nn.Module):
+class KeypointDetector(nn.Module):
     """
     Detecting canonical keypoints. Return keypoint position and jacobian near each keypoint.
 
@@ -44,7 +44,7 @@ class KPDetector(nn.Module):
             scale_factor=0.25,
             # estimate_jacobian=False, 
         ):
-        super(KPDetector, self).__init__()
+        super(KeypointDetector, self).__init__()
         self.predictor = KPHourglass(block_expansion, in_features=image_channel,
                                      max_features=max_features, reshape_features=reshape_channel,
                                      reshape_depth=reshape_depth, num_blocks=num_blocks)

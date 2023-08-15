@@ -113,7 +113,7 @@ def keypoint_transformation(kp_canonical, he):
 
     return {'value': kp_transformed}
 
-
+# xxxx8888 **************************************************************
 def make_animation(source_image, source_semantics, target_semantics, generator, kp_detector, mapping):
     with torch.no_grad():
         predictions = []
@@ -122,10 +122,11 @@ def make_animation(source_image, source_semantics, target_semantics, generator, 
         # source_semantics.size() -- [2, 70, 27]
         # target_semantics.size() -- [2, 100, 70, 27]
 
-        # kp_detector -- KPDetector(...)
+        # kp_detector -- KeypointDetector(...)
         kp_canonical = kp_detector(source_image) # kp_canonical['value'].size() -- [2, 15, 3]
 
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # mapping -- MappingNet(...)            
         he_source = mapping(source_semantics) # head estimation rotation matrix ?
         # he_source.keys() -- ['yaw', 'pitch', 'roll', 't', 'exp']
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
@@ -143,7 +144,10 @@ def make_animation(source_image, source_semantics, target_semantics, generator, 
             # source_image.size() -- [2, 3, 256, 256]
             # kp_source['value'].size() -- [2, 15, 3]
             # kp_driving['value'].size() -- [2, 15, 3]
+
+            # generator -- OcclusionAwareSPADEGenerator(...)
             out = generator(source_image, kp_source=kp_source, kp_driving=kp_driving)
+            
             # out.keys() -- ['mask', 'occlusion_map', 'prediction']
             # out['prediction'].size() -- [2, 3, 256, 256]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

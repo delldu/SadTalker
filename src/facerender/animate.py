@@ -8,7 +8,7 @@ import safetensors.torch
 import imageio
 import torch
 
-from src.facerender.modules.keypoint_detector import KPDetector
+from src.facerender.modules.keypoint_detector import KeypointDetector
 from src.facerender.modules.mapping import MappingNet
 from src.facerender.modules.generator import OcclusionAwareSPADEGenerator
 from src.facerender.modules.make_animation import make_animation 
@@ -33,7 +33,7 @@ class AnimateFromCoeff():
         self.generator = OcclusionAwareSPADEGenerator().to(device)
         self.generator.eval()
 
-        self.kp_extractor = KPDetector().to(device)
+        self.kp_extractor = KeypointDetector().to(device)
         self.kp_extractor.eval()
 
         self.mapping = MappingNet().to(device)
@@ -57,7 +57,7 @@ class AnimateFromCoeff():
                         kp_detector=None, device="cpu"):
         # checkpoint_path = './checkpoints/SadTalker_V0.0.2_256.safetensors'
         # generator = OcclusionAwareSPADEGenerator(...)
-        # kp_detector = KPDetector(...)
+        # kp_detector = KeypointDetector(...)
 
         checkpoint = safetensors.torch.load_file(checkpoint_path)
 
