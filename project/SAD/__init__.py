@@ -1,10 +1,11 @@
-"""Image Recognize Anything Model Package."""  # coding=utf-8
+"""SadTalking Model Package."""
+# coding=utf-8
 #
 # /************************************************************************************
 # ***
 # ***    Copyright Dell 2023(18588220928@163.com) All Rights Reserved.
 # ***
-# ***    File Author: Dell, Thu 13 Jul 2023 01:55:56 PM CST
+# ***    File Author: Dell, Wed 16 Aug 2023 04:17:55 PM CST
 # ***
 # ************************************************************************************/
 #
@@ -43,10 +44,10 @@ def get_model():
     model, device = create_model()
     # print(model)
 
-    model = torch.jit.script(model)
-    todos.data.mkdir("output")
-    if not os.path.exists("output/SAD.torch"):
-        model.save("output/SAD.torch")
+    # model = torch.jit.script(model)
+    # todos.data.mkdir("output")
+    # if not os.path.exists("output/SAD.torch"):
+    #     model.save("output/SAD.torch")
 
     return model, device
 
