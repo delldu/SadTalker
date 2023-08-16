@@ -10,7 +10,9 @@ from src.face3d.models import image2coeff # networks
 
 from scipy.io import savemat
 from src.utils.croper import Preprocesser
-from src.utils.safetensor_helper import load_x_from_safetensor 
+from src.utils.safetensor_helper import load_x_from_safetensor
+from src.utils.debug import debug_var
+
 import pdb
 
 def split_coeff(coeffs):
@@ -169,7 +171,10 @@ class CropAndExtract(): # xxxx8888
                 video_coeffs.append(pred_coeff)
                 full_coeffs.append(full_coeff.cpu().numpy()) # useless
 
-            semantic_npy = np.array(video_coeffs)[:, 0] 
+            semantic_npy = np.array(video_coeffs)[:, 0]
+            # debug_var("semantic_npy", semantic_npy[:, 0:70])
+            # pdb.set_trace()
+
             image_coeff_dict = {'coeff_3dmm': semantic_npy, 'full_3dmm': np.array(full_coeffs)[0]}
             savemat(image_coeff_path, image_coeff_dict)
 

@@ -8,7 +8,6 @@
 # ***
 # ************************************************************************************/
 #
-from tqdm import tqdm
 import torch
 from torch import nn
 from SAD.util import load_weights
@@ -22,7 +21,7 @@ class Audio2Exp(nn.Module):
         super(Audio2Exp, self).__init__()
         self.netG = Audio2ExpWrapperV2()
 
-        load_weights(self, "models/Audio2Exp.pth")
+        # load_weights(self, "models/Audio2Exp.pth")
 
         # torch.jit.script(self) ==> batch ???
         # torch.jit.script(self.netG) ==> OK
@@ -34,35 +33,27 @@ class Audio2Exp(nn.Module):
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
         #     audio_num_frames value: 200
         #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
-        #     audio_name value: 'chinese_news'
-        #     image_name value: 'dell'
 
         mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]
-        bs = mel_input.shape[0]
         T = mel_input.shape[1] # [200, 1, 80, 16], T -- batch size
 
-        exp_coeff_pred = []
+        exp_predict_list = []
 
-        for i in tqdm(range(0, T, 10),'audio2exp:'): # every 10 frames
+        for i in range(0, T, 10): # every 10 frames
             current_mel_input = mel_input[:,i:i+10]
             audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
 
-            image_exp = batch['image_exp_pose'][:, :, :64][:, i:i+10] # size() -- [1, 10, 64]
+            image_exp = batch['image_exp_pose'][:, i:i+10, 0:64] # size() -- [1, 10, 64]
             audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # self.netG -- Audio2ExpWrapperV2(...)
-            curr_exp_coeff_pred  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
+            y  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 
-            exp_coeff_pred += [curr_exp_coeff_pred]
+            exp_predict_list += [y]
 
-        # BS x T x 64
-        results_dict = {
-            'exp_coeff_pred': torch.cat(exp_coeff_pred, axis=1) # size() -- [1, 200, 64]
-            }
-        
-        return results_dict
+        return torch.cat(exp_predict_list, axis=1) # size() -- [1, 200, 64]
 
 
 class Conv2d(nn.Module):

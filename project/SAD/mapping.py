@@ -53,7 +53,7 @@ class MappingNet(nn.Module):
         self.fc_t = nn.Linear(descriptor_nc, 3)
         self.fc_exp = nn.Linear(descriptor_nc, 3*num_kp)
 
-        load_weights(self, "models/MappingNet.pth")
+        # load_weights(self, "models/MappingNet.pth")
 
         # torch.jit.script(self) ==> Error
 

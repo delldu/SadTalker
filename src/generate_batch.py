@@ -73,7 +73,7 @@ def get_data(image_coeff_path, audio_path, device):
         seq = [ min(max(item, 0), orig_mel.shape[0]-1) for item in seq ] # orig_mel.shape -- (641, 80)
         m = orig_mel[seq, :]
         audio_mels.append(m.T)
-    audio_mels = np.asarray(audio_mels)
+    audio_mels = np.asarray(audio_mels) # ==> (200, 80, 16)
     audio_mels = torch.FloatTensor(audio_mels).unsqueeze(1).unsqueeze(0) # bs T 1 80 16
     audio_mels = audio_mels.to(device) # size() -- [1, 200, 1, 80, 16]
 

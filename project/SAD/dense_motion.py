@@ -12,8 +12,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from SAD.util import make_coordinate_grid, UpBlock3d
-
 from typing import Dict
+import pdb
 
 class DenseMotionNetwork(nn.Module):
     """
@@ -53,9 +53,9 @@ class DenseMotionNetwork(nn.Module):
 
     def create_sparse_motions(self, feature, audio_kp, image_kp):
         bs, _, d, h, w = feature.shape
-        identity_grid = make_coordinate_grid((d, h, w), type=image_kp['value'].type())
+        identity_grid = make_coordinate_grid((d, h, w), type=image_kp.type())
         identity_grid = identity_grid.view(1, 1, d, h, w, 3)
-        coordinate_grid = identity_grid - audio_kp['value'].view(bs, self.num_kp, 1, 1, 1, 3)
+        coordinate_grid = identity_grid - audio_kp.view(bs, self.num_kp, 1, 1, 1, 3)
         
         # # if 'jacobian' in audio_kp:
         # if 'jacobian' in audio_kp and audio_kp['jacobian'] is not None:
@@ -66,7 +66,7 @@ class DenseMotionNetwork(nn.Module):
         #     coordinate_grid = coordinate_grid.squeeze(-1)                  
 
 
-        driving_to_source = coordinate_grid + image_kp['value'].view(bs, self.num_kp, 1, 1, 1, 3)    # (bs, num_kp, d, h, w, 3)
+        driving_to_source = coordinate_grid + image_kp.view(bs, self.num_kp, 1, 1, 1, 3)    # (bs, num_kp, d, h, w, 3)
 
         #adding background feature
         identity_grid = identity_grid.repeat(bs, 1, 1, 1, 1, 1)
@@ -214,7 +214,7 @@ def kp2gaussian(kp, spatial_size, kp_variance):
     """
     Transform a keypoint into gaussian like representation
     """
-    mean = kp['value']
+    mean = kp
 
     coordinate_grid = make_coordinate_grid(spatial_size, mean.type())
     number_of_leading_dimensions = len(mean.shape) - 1

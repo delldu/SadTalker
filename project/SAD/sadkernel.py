@@ -74,7 +74,7 @@ class SADKernel(nn.Module):
 
         self.decoder = SPADEDecoder()
 
-        load_weights(self, "models/SADKernel.pth")
+        # load_weights(self, "models/SADKernel.pth")
 
         # torch.jit.script(self) ==> Error !
         # torch.jit.script(self.decoder) ==> AttributeError: 'SpectralNorm' object has no attribute '__name__'
@@ -91,7 +91,7 @@ class SADKernel(nn.Module):
             deformation = deformation.permute(0, 2, 3, 4, 1)
         return F.grid_sample(inp, deformation, align_corners=False)
 
-    def forward(self, source_image, audio_kp, image_kp) -> Dict[str, torch.Tensor]:
+    def forward(self, source_image, audio_kp, image_kp):
         # Encoding (downsampling) part
         out = self.first(source_image)
         for i in range(len(self.down_blocks)):
@@ -104,7 +104,6 @@ class SADKernel(nn.Module):
 
         # Transforming feature representation according to deformation and occlusion
         output_dict = {}
-
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # feature_3d.size() -- [2, 32, 16, 64, 64]
         # dense_motion -- DenseMotionNetwork(...)
@@ -132,10 +131,7 @@ class SADKernel(nn.Module):
 
         # Decoding part
         out = self.decoder(out)
-
-        output_dict["prediction"] = out # size() -- [2, 3, 256, 256]
-
-        return output_dict
+        return out # size() -- [2, 3, 256, 256]
 
 class SPADEDecoder(nn.Module):
     def __init__(self):

@@ -11,6 +11,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn import init
 from SAD.util import load_weights
 
@@ -44,15 +45,29 @@ class Image2Coeff(nn.Module):
             nn.init.constant_(m.bias, 0.)
 
         # torch.jit.script(self) ==> Error, ResNet._forward_impl, 295
-        load_weights(self, "models/Image2Coeff.pth")
+        # load_weights(self, "models/Image2Coeff.pth")
 
     def forward(self, x):
+        # resize to Bx3x224x224
+        x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=False)
+
         x = self.backbone(x)
         output = []
         for layer in self.final_layers:
             output.append(layer(x))
         x = torch.flatten(torch.cat(output, dim=1), 1)
-        return x
+
+        ##################################################
+        # id = x[:, :80]
+        # exp = x[:, 80: 144], dim = 64
+        # tex = x[:, 144: 224]
+        # angle = x[:, 224: 227], dim = 3
+        # gamma = x[:, 227: 254]
+        # trans = x[:, 254: 257], dim = 3
+        # ==> exp + angle + trans, total dim is 
+        ##################################################
+
+        return torch.cat((x[:, 80:144], x[:, 224:227], x[:, 254:257]), dim=1)
 
 __all__ = ['ResNet', 'resnet50']
 

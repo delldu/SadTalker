@@ -19,8 +19,11 @@ import numpy as np
 
 import torch
 import todos
-from .sad import SADModel
+import torchaudio
 from torchvision.transforms import Compose, ToTensor
+from SAD.sad import SADModel
+from SAD.debug import debug_var
+
 import pdb
 
 
@@ -51,6 +54,24 @@ def get_model():
 
     return model, device
 
+def load_wav(audio_path, new_sample_rate=16000):
+    wav, sample_rate = torchaudio.load(audio_path)
+    wav = torchaudio.functional.resample(wav, orig_freq=sample_rate, new_freq=new_sample_rate)[0]
+
+    # Parse audio length
+    fps = 25
+    bit_per_frames = new_sample_rate / fps
+    num_frames = int(len(wav) / bit_per_frames)
+    wav_length = int(num_frames * bit_per_frames)
+
+    # Crop pad
+    if len(wav) > wav_length:
+        wav = wav[:wav_length]
+    elif len(wav) < wav_length:
+        wav = torch.pad(wav, [0, wav_length - len(wav)], mode='constant', constant_values=0)
+
+    return wav.reshape(num_frames, -1)
+
 
 def predict(audio_file, image_file, output_dir):
     # Create directory to store result
@@ -58,30 +79,25 @@ def predict(audio_file, image_file, output_dir):
 
     # load model
     model, device = get_model()
-    transform = Compose([
-        lambda image: image.convert("RGB"),
-        ToTensor(),
-    ])
 
-    # audio = Audio.load(audio_file)
-    # audio_tensor = audio.to(device)
-    audio_tensor = torch.randn(100, 27).to(device)
+    # load audio
+    audio = load_wav(audio_file)
+    audio_tensor = audio.to(device)
+    # tensor [audio_tensor] size: [200, 640] , min: tensor(-1.0130, device='cuda:0') , max: tensor(1.0737, device='cuda:0')
 
     image = Image.open(image_file).convert("RGB")
-    image_tensor = transform(image).unsqueeze(0).to(device)
+    image_tensor = ToTensor()(image).unsqueeze(0).to(device)
+    # tensor [image_tensor] size: [1, 3, 512, 512] , min: tensor(0.1176, device='cuda:0') , max: tensor(1., device='cuda:0')
 
-    # start predict
-    results = []
-    progress_bar = tqdm(total=100)
-    # for filename in image_filenames:
-    #     progress_bar.update(1)
+    with torch.no_grad():
+        output_tensor = model(audio_tensor, image_tensor)
 
-    #     with torch.no_grad():
-    #         output_tensor = model(audio_tensor, image_tensor).cpu()
-
-    #     results.append(output_tensor)
-    progress_bar.close()
-
-    print("\n".join(results))
+    todos.data.mkdir(output_dir)
+    B, C, H, W = output_tensor.size()
+    for i in range(B):
+        output_file = f"{output_dir}/{i:06d}.png"
+        todos.data.save_tensor([output_tensor[i].unsqueeze(0)], output_file)
 
     todos.model.reset_device()
+
+

@@ -69,7 +69,7 @@ class KPDetector(nn.Module):
         else: # To support torch.jit.script
             self.down = nn.Identity()
 
-        load_weights(self, "models/KPDetector.pth")
+        # load_weights(self, "models/KPDetector.pth")
 
         # torch.jit.script(self)  ==> Error
         # torch.jit.script(self.predictor) ==> Error
@@ -84,11 +84,10 @@ class KPDetector(nn.Module):
         heatmap = heatmap.unsqueeze(-1)
         grid = make_coordinate_grid(shape[2:], heatmap.type()).unsqueeze_(0).unsqueeze_(0)
         value = (heatmap * grid).sum(dim=(2, 3, 4))
-        kp = {'value': value}
 
-        return kp
+        return value
 
-    def forward(self, x) -> Dict[str, torch.Tensor]:
+    def forward(self, x):
         x = self.down(x)
 
         feature_map = self.predictor(x)

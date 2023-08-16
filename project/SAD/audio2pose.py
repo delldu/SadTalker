@@ -14,7 +14,6 @@ from torch import nn
 from SAD.util import load_weights
 from SAD.debug import debug_var
 
-
 from typing import Dict
 import pdb
 
@@ -41,7 +40,7 @@ class Audio2Pose(nn.Module):
 
         self.netG = CVAE()
 
-        load_weights(self, "models/Audio2Pose.pth")
+        # load_weights(self, "models/Audio2Pose.pth")
 
 
     def forward(self, x: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -51,8 +50,6 @@ class Audio2Pose(nn.Module):
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
         #     audio_num_frames value: 200
         #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
-        #     audio_name value: 'chinese_news'
-        #     image_name value: 'dell'
         #     tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
 
         batch = {}
@@ -68,7 +65,7 @@ class Audio2Pose(nn.Module):
 
         div = audio_num_frames//self.seq_len
         re = audio_num_frames%self.seq_len
-        pose_motion_pred_list = [torch.zeros(batch['image_pose'].unsqueeze(1).shape, 
+        pose_pred_list = [torch.zeros(batch['image_pose'].unsqueeze(1).shape, 
                                 dtype=batch['image_pose'].dtype, 
                                 device=batch['image_pose'].device)]
 
@@ -79,10 +76,9 @@ class Audio2Pose(nn.Module):
             batch['audio_emb'] = audio_emb
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            batch = self.netG(batch) # CVAE(...)
+            y = self.netG(batch) # CVAE(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-            pose_motion_pred_list.append(batch['pose_motion_pred'])  #list of bs seq_len 6
+            pose_pred_list.append(y)  #list of bs seq_len 6
         
         if re != 0:
             z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
@@ -95,27 +91,14 @@ class Audio2Pose(nn.Module):
             batch['audio_emb'] = audio_emb
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            batch = self.netG(batch)  # CVAE(...)
+            y = self.netG(batch)  # CVAE(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-            pose_motion_pred_list.append(batch['pose_motion_pred'][:,-1*re:,:])   
+            pose_pred_list.append(y[:,-1*re:,:])   
         
-        pose_motion_pred = torch.cat(pose_motion_pred_list, dim = 1)
-        batch['pose_motion_pred'] = pose_motion_pred
+        audio_pose_pred = torch.cat(pose_pred_list, dim = 1)
+        pose_pred = image_exp_pose[:, :1, -6:] + audio_pose_pred  # [1, 200, 6]
 
-        pose_pred = image_exp_pose[:, :1, -6:] + pose_motion_pred  # [1, 200, 6]
-
-        batch['pose_pred'] = pose_pred # size() -- [1, 200, 6] 
-        
-        # debug_var("Audio2Pose.batch", batch)
-        # Audio2Pose.batch is dict:
-        # tensor image_pose size: [1, 6] , min: tensor(-0.0195, device='cuda:0') , max: tensor(0.2540, device='cuda:0')
-        # tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
-        # tensor z size: [1, 64] , min: tensor(-1.8347, device='cuda:0') , max: tensor(1.8609, device='cuda:0')
-        # tensor audio_emb size: [1, 32, 512] , min: tensor(0., device='cuda:0') , max: tensor(10.3144, device='cuda:0')
-        # tensor pose_pred size: [1, 200, 6] , min: tensor(-0.0595, device='cuda:0') , max: tensor(0.5657, device='cuda:0')
-
-        return batch
+        return pose_pred # [1, 200, 6]
 
 class ResidualConv(nn.Module):
     def __init__(self, input_dim, output_dim, stride, padding):
@@ -363,19 +346,9 @@ class Decoder(nn.Module):
         x_out = x_out.reshape((bs, self.seq_len, -1))
 
         pose_emb = self.resunet(x_out.unsqueeze(1))             #bs 1 seq_len 6
+        y = self.pose_linear(pose_emb.squeeze(1))       #bs seq_len 6
 
-        pose_motion_pred = self.pose_linear(pose_emb.squeeze(1))       #bs seq_len 6
-
-        batch.update({'pose_motion_pred':pose_motion_pred}) # size() -- [1, 32, 6]
-
-        # debug_var("Decoder.batch", batch)
-        # Decoder.batch is dict:
-        #     tensor image_pose size: [1, 6] , min: tensor(-0.0195, device='cuda:0') , max: tensor(0.2540, device='cuda:0')
-        #     tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
-        #     tensor z size: [1, 64] , min: tensor(-2.7728, device='cuda:0') , max: tensor(1.7963, device='cuda:0')
-        #     tensor audio_emb size: [1, 32, 512] , min: tensor(0., device='cuda:0') , max: tensor(8.4478, device='cuda:0')
-
-        return batch
+        return y # size() -- [1, 32, 6]
 
 
 if __name__ == "__main__":
