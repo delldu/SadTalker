@@ -16,10 +16,6 @@ import pdb
 
 # xxxx8888 *************************************************************************
 class AudioCoeffModel():
-    '''
-        ==> (200, 70) --70 = pose(6) + exp(64)
-    '''
-
     def __init__(self, sadtalker_path, device):
         # load audio2pose_model
         self.audio2pose_model = Audio2Pose(device=device)
@@ -33,7 +29,7 @@ class AudioCoeffModel():
             checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
             self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose', 
                 skip_key1='netG.encoder.', skip_key2='netD_motion.seq.'))
-            torch.save(self.audio2pose_model.state_dict(), "/tmp/Audio2Pose.pth") # xxxx3333
+            # torch.save(self.audio2pose_model.state_dict(), "/tmp/Audio2Pose.pth") # xxxx3333
         except:
             raise Exception("Failed in loading audio2pose_checkpoint")
 
@@ -45,12 +41,13 @@ class AudioCoeffModel():
         try:
             checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
             self.audio2exp_model.netG.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2exp'))
-            torch.save(self.audio2exp_model.state_dict(), "/tmp/Audio2Exp.pth") # xxxx3333
+            # torch.save(self.audio2exp_model.state_dict(), "/tmp/Audio2Exp.pth") # xxxx3333
         except:
             raise Exception("Failed in loading audio2exp_checkpoint")
 
         self.device = device
 
+    # xxxx9999 Step 2
     def generate(self, batch, coeff_save_dir, pose_style):
         # debug_var("AudioCoeffModel.batch", batch)
         # AudioCoeffModel.batch is dict:

@@ -77,7 +77,7 @@ class SADKernel(nn.Module):
             deformation = deformation.permute(0, 2, 3, 4, 1)
         return F.grid_sample(inp, deformation, align_corners=False)
 
-    def forward(self, source_image, kp_driving, kp_source) -> Dict[str, torch.Tensor]:
+    def forward(self, source_image, audio_kp, image_kp) -> Dict[str, torch.Tensor]:
         # Encoding (downsampling) part
         out = self.first(source_image)
         for i in range(len(self.down_blocks)):
@@ -94,8 +94,8 @@ class SADKernel(nn.Module):
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # feature_3d.size() -- [2, 32, 16, 64, 64]
         # dense_motion -- DenseMotionNetwork(...)
-        dense_motion = self.dense_motion_network(feature=feature_3d, kp_driving=kp_driving,
-                                                 kp_source=kp_source)
+        dense_motion = self.dense_motion_network(feature=feature_3d, audio_kp=audio_kp,
+                                                 image_kp=image_kp)
 
         # dense_motion.keys() -- ['mask', 'deformation', 'occlusion_map']
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

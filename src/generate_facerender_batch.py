@@ -39,23 +39,24 @@ def get_facerender_data(coeff_path, pic_path, image_coeff_path, audio_path, batc
     audio_coeff_dict = scio.loadmat(coeff_path)
     # audio_coeff_dict['coeff_3dmm'].shape -- (200, 70)
 
+    # xxxx7777 Step 2
     if 'full' not in preprocess.lower(): # True !!!
-        source_semantics = image_coeff_dict['coeff_3dmm'][:1,:70] #1 70
+        image_semantics = image_coeff_dict['coeff_3dmm'][:1,:70] #1 70
         audio_exp_pose = audio_coeff_dict['coeff_3dmm'][:,:70]
     else: # full mode !!!
-        source_semantics = image_coeff_dict['coeff_3dmm'][:1,:73]
+        image_semantics = image_coeff_dict['coeff_3dmm'][:1,:73]
         audio_exp_pose = audio_coeff_dict['coeff_3dmm'][:,:70]
 
-    source_semantics_new = transform_semantic(source_semantics, semantic_radius)
-    source_semantics_ts = torch.FloatTensor(source_semantics_new).unsqueeze(0)
-    source_semantics_ts = source_semantics_ts.repeat(batch_size, 1, 1)
-    data['source_semantics'] = source_semantics_ts
+    image_semantics_new = transform_semantic(image_semantics, semantic_radius)
+    image_semantics_ts = torch.FloatTensor(image_semantics_new).unsqueeze(0)
+    image_semantics_ts = image_semantics_ts.repeat(batch_size, 1, 1)
+    data['image_semantics'] = image_semantics_ts
 
     # target 
     audio_exp_pose[:, :64] = audio_exp_pose[:, :64] * expression_scale # expression_scale -- 1.0
 
     if 'full' in preprocess.lower():
-        audio_exp_pose = np.concatenate([audio_exp_pose, np.repeat(source_semantics[:,70:], audio_exp_pose.shape[0], axis=0)], axis=1)
+        audio_exp_pose = np.concatenate([audio_exp_pose, np.repeat(image_semantics[:,70:], audio_exp_pose.shape[0], axis=0)], axis=1)
 
     with open(txt_path+'.txt', 'w') as f:
         for coeff in audio_exp_pose:
@@ -63,31 +64,32 @@ def get_facerender_data(coeff_path, pic_path, image_coeff_path, audio_path, batc
                 f.write(str(i)[:7]   + '  '+'\t')
             f.write('\n')
 
-    target_semantics_list = [] 
+    # xxxx9999 Step 3
+    audio_semantics_list = [] 
     audio_frame_num = audio_exp_pose.shape[0] # 200
     data['audio_frame_num'] = audio_frame_num
     for frame_idx in range(audio_frame_num):
-        target_semantics = transform_semantic_target(audio_exp_pose, frame_idx, semantic_radius)
-        target_semantics_list.append(target_semantics)
+        audio_semantics = transform_semantic_target(audio_exp_pose, frame_idx, semantic_radius)
+        audio_semantics_list.append(audio_semantics)
 
     remainder = audio_frame_num%batch_size
     if remainder != 0:
         for _ in range(batch_size-remainder):
-            target_semantics_list.append(target_semantics)
+            audio_semantics_list.append(audio_semantics)
 
-    target_semantics_np = np.array(target_semantics_list)
-    target_semantics_np = target_semantics_np.reshape(batch_size, -1, 
-                                target_semantics_np.shape[-2], target_semantics_np.shape[-1])
-    data['target_semantics'] = torch.FloatTensor(target_semantics_np)
+    audio_semantics_np = np.array(audio_semantics_list)
+    audio_semantics_np = audio_semantics_np.reshape(batch_size, -1, 
+                                audio_semantics_np.shape[-2], audio_semantics_np.shape[-1])
+    data['audio_semantics'] = torch.FloatTensor(audio_semantics_np)
     data['video_name'] = video_name
     data['audio_path'] = audio_path
 
     # debug_var("get_facerender_data.data", data)
     # get_facerender_data.data is dict:
     #     tensor source_image size: [2, 3, 256, 256] , min: tensor(0.1216) , max: tensor(1.)
-    #     tensor source_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
+    #     tensor image_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
     #     audio_frame_num value: 200
-    #     tensor target_semantics size: [2, 100, 70, 27] , min: tensor(-1.6630) , max: tensor(1.0894)
+    #     tensor audio_semantics size: [2, 100, 70, 27] , min: tensor(-1.6630) , max: tensor(1.0894)
     #     video_name value: 'dell##chinese_news'
     #     audio_path value: 'examples/driven_audio/chinese_news.wav'
 

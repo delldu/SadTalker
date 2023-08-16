@@ -5,7 +5,6 @@ import os
 import torch
 import torch.nn as nn
 from torch.nn import init
-from torch import Tensor
 try:
     from torch.hub import load_state_dict_from_url
 except ImportError:
@@ -99,7 +98,7 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         identity = x
 
         out = self.conv1(x)
@@ -153,7 +152,7 @@ class Bottleneck(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         identity = x
 
         out = self.conv1(x)
@@ -220,8 +219,8 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        
-        if self.use_last_fc:
+
+        if self.use_last_fc: # False
             self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -266,7 +265,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor) -> Tensor:
+    def _forward_impl(self, x):
         # See note [TorchScript super()]
         x = self.conv1(x)
         x = self.bn1(x)
@@ -284,7 +283,7 @@ class ResNet(nn.Module):
             x = self.fc(x)
         return x
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         return self._forward_impl(x)
 
 

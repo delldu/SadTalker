@@ -66,9 +66,9 @@ def main(args):
     # debug_var("coeff2video.data", data)
     # coeff2video.data is dict:
     #     tensor source_image size: [2, 3, 256, 256] , min: tensor(0.1216) , max: tensor(1.)
-    #     tensor source_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
+    #     tensor image_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
     #     audio_frame_num value: 200
-    #     tensor target_semantics size: [2, 100, 70, 27] , min: tensor(-1.5285) , max: tensor(1.0894)
+    #     tensor audio_semantics size: [2, 100, 70, 27] , min: tensor(-1.5285) , max: tensor(1.0894)
     #     video_name value: 'dell##chinese_news'
     #     audio_path value: 'examples/driven_audio/chinese_news.wav'
     

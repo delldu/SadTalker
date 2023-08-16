@@ -8,7 +8,7 @@ from typing import Dict
 
 class DenseMotionNetwork(nn.Module):
     """
-    Module that predicting a dense motion from sparse motion representation given by kp_source and kp_driving
+    Module that predicting a dense motion from sparse motion representation given by image_kp and audio_kp
     src/config/facerender.yaml
         dense_motion_params:
           block_expansion: 32
@@ -42,22 +42,22 @@ class DenseMotionNetwork(nn.Module):
         self.num_kp = num_kp
 
 
-    def create_sparse_motions(self, feature, kp_driving, kp_source):
+    def create_sparse_motions(self, feature, audio_kp, image_kp):
         bs, _, d, h, w = feature.shape
-        identity_grid = make_coordinate_grid((d, h, w), type=kp_source['value'].type())
+        identity_grid = make_coordinate_grid((d, h, w), type=image_kp['value'].type())
         identity_grid = identity_grid.view(1, 1, d, h, w, 3)
-        coordinate_grid = identity_grid - kp_driving['value'].view(bs, self.num_kp, 1, 1, 1, 3)
+        coordinate_grid = identity_grid - audio_kp['value'].view(bs, self.num_kp, 1, 1, 1, 3)
         
-        # # if 'jacobian' in kp_driving:
-        # if 'jacobian' in kp_driving and kp_driving['jacobian'] is not None:
-        #     jacobian = torch.matmul(kp_source['jacobian'], torch.inverse(kp_driving['jacobian']))
+        # # if 'jacobian' in audio_kp:
+        # if 'jacobian' in audio_kp and audio_kp['jacobian'] is not None:
+        #     jacobian = torch.matmul(image_kp['jacobian'], torch.inverse(audio_kp['jacobian']))
         #     jacobian = jacobian.unsqueeze(-3).unsqueeze(-3).unsqueeze(-3)
         #     jacobian = jacobian.repeat(1, 1, d, h, w, 1, 1)
         #     coordinate_grid = torch.matmul(jacobian, coordinate_grid.unsqueeze(-1))
         #     coordinate_grid = coordinate_grid.squeeze(-1)                  
 
 
-        driving_to_source = coordinate_grid + kp_source['value'].view(bs, self.num_kp, 1, 1, 1, 3)    # (bs, num_kp, d, h, w, 3)
+        driving_to_source = coordinate_grid + image_kp['value'].view(bs, self.num_kp, 1, 1, 1, 3)    # (bs, num_kp, d, h, w, 3)
 
         #adding background feature
         identity_grid = identity_grid.repeat(bs, 1, 1, 1, 1, 1)
@@ -76,10 +76,10 @@ class DenseMotionNetwork(nn.Module):
         sparse_deformed = sparse_deformed.view((bs, self.num_kp+1, -1, d, h, w))                        # (bs, num_kp+1, c, d, h, w)
         return sparse_deformed
 
-    def create_heatmap_representations(self, feature, kp_driving, kp_source):
+    def create_heatmap_representations(self, feature, audio_kp, image_kp):
         spatial_size = feature.shape[3:]
-        gaussian_driving = kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=0.01)
-        gaussian_source = kp2gaussian(kp_source, spatial_size=spatial_size, kp_variance=0.01)
+        gaussian_driving = kp2gaussian(audio_kp, spatial_size=spatial_size, kp_variance=0.01)
+        gaussian_source = kp2gaussian(image_kp, spatial_size=spatial_size, kp_variance=0.01)
         heatmap = gaussian_driving - gaussian_source
 
         # adding background feature
@@ -88,7 +88,7 @@ class DenseMotionNetwork(nn.Module):
         heatmap = heatmap.unsqueeze(2)         # (bs, num_kp+1, 1, d, h, w)
         return heatmap
 
-    def forward(self, feature, kp_driving, kp_source) -> Dict[str, torch.Tensor]:
+    def forward(self, feature, audio_kp, image_kp) -> Dict[str, torch.Tensor]:
         bs, _, d, h, w = feature.shape
 
         feature = self.compress(feature)
@@ -96,10 +96,10 @@ class DenseMotionNetwork(nn.Module):
         feature = F.relu(feature)
 
         out_dict = dict()
-        sparse_motion = self.create_sparse_motions(feature, kp_driving, kp_source)
+        sparse_motion = self.create_sparse_motions(feature, audio_kp, image_kp)
         deformed_feature = self.create_deformed_feature(feature, sparse_motion)
 
-        heatmap = self.create_heatmap_representations(deformed_feature, kp_driving, kp_source)
+        heatmap = self.create_heatmap_representations(deformed_feature, audio_kp, image_kp)
 
         input_ = torch.cat([heatmap, deformed_feature], dim=2)
         input_ = input_.view(bs, -1, d, h, w)

@@ -44,13 +44,13 @@ def get_data(image_coeff_path, audio_path, device):
     # image_coeff_path = './results/2023_08_13_10.45.38/first_frame_dir/dell.mat'
     # audio_path = 'examples/driven_audio/chinese_news.wav'
 
-    syncnet_mel_step_size = 16
+    mel_step_size = 16
     fps = 25
 
     image_name = os.path.splitext(os.path.split(image_coeff_path)[-1])[0]
     audio_name = os.path.splitext(os.path.split(audio_path)[-1])[0]
 
-
+    # xxxx9999 Step 1
     wav = audio.load_wav(audio_path, 16000) # wav.dtype -- dtype=float32
     # wav.reshape(200, -1).shape -- (200, 640)
 
@@ -61,19 +61,19 @@ def get_data(image_coeff_path, audio_path, device):
     orig_mel = audio.melspectrogram(wav).T # orig_mel.shape -- (641, 80), xxxx8888 !!!
     # array orig_mel shape: (641, 80) , min: -4.0 , max: 2.5998246882359766
 
-    torch_mel = audio.torch_melspectrogram(torch.from_numpy(wav)).T
-    debug_var("torch_mel", torch_mel)
+    # torch_mel = audio.torch_melspectrogram(torch.from_numpy(wav)).T
+    # debug_var("torch_mel", torch_mel)
 
     audio_mels = []
     for i in tqdm(range(audio_num_frames), 'mel:'):
         start_frame_num = i-2
         start_idx = int(80. * (start_frame_num / float(fps)))
-        end_idx = start_idx + syncnet_mel_step_size
+        end_idx = start_idx + mel_step_size
         seq = list(range(start_idx, end_idx))
         seq = [ min(max(item, 0), orig_mel.shape[0]-1) for item in seq ] # orig_mel.shape -- (641, 80)
         m = orig_mel[seq, :]
         audio_mels.append(m.T)
-    audio_mels = np.asarray(audio_mels)         # T 80 16
+    audio_mels = np.asarray(audio_mels)
     audio_mels = torch.FloatTensor(audio_mels).unsqueeze(1).unsqueeze(0) # bs T 1 80 16
     audio_mels = audio_mels.to(device) # size() -- [1, 200, 1, 80, 16]
 

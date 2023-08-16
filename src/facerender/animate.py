@@ -67,14 +67,14 @@ class AnimateFromCoeff():
             if 'generator' in k:
                 x_generator[k.replace('generator.', '')] = v
         generator.load_state_dict(x_generator)
-        torch.save(generator.state_dict(), "/tmp/SADKernel.pth") # xxxx3333
+        # torch.save(generator.state_dict(), "/tmp/SADKernel.pth") # xxxx3333
 
         x_generator = {}
         for k,v in checkpoint.items():
             if 'kp_extractor' in k:
                 x_generator[k.replace('kp_extractor.', '')] = v
         kp_detector.load_state_dict(x_generator)
-        torch.save(kp_detector.state_dict(), "/tmp/KPDetector.pth") # xxxx3333
+        # torch.save(kp_detector.state_dict(), "/tmp/KPDetector.pth") # xxxx3333
         
 
     def load_cpk_mapping(self, checkpoint_path, mapping, device='cpu'):
@@ -83,7 +83,7 @@ class AnimateFromCoeff():
 
         checkpoint = torch.load(checkpoint_path,  map_location=torch.device(device))
         mapping.load_state_dict(checkpoint['mapping'])
-        torch.save(mapping.state_dict(), "/tmp/MappingNet.pth") # xxxx3333
+        # torch.save(mapping.state_dict(), "/tmp/MappingNet.pth") # xxxx3333
 
         return checkpoint['epoch'] # 229
 
@@ -95,19 +95,19 @@ class AnimateFromCoeff():
         # debug_var("AnimateFromCoeff.x", x)
         # AnimateFromCoeff.x is dict:
         #     tensor source_image size: [2, 3, 256, 256] , min: tensor(0.1216) , max: tensor(1.)
-        #     tensor source_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
+        #     tensor image_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
         #     audio_frame_num value: 200
-        #     tensor target_semantics size: [2, 100, 70, 27] , min: tensor(-1.6407) , max: tensor(1.0894)
+        #     tensor audio_semantics size: [2, 100, 70, 27] , min: tensor(-1.6407) , max: tensor(1.0894)
         #     video_name value: 'dell##chinese_news'
         #     audio_path value: 'examples/driven_audio/chinese_news.wav'
 
         source_image=x['source_image'].to(self.device) # size() -- [2, 3, 256, 256]
-        source_semantics=x['source_semantics'].to(self.device)  # size() -- [2, 70, 27]
-        target_semantics=x['target_semantics'].to(self.device)  # size() -- [2, 100, 70, 27]
+        image_semantics=x['image_semantics'].to(self.device)  # size() -- [2, 70, 27]
+        audio_semantics=x['audio_semantics'].to(self.device)  # size() -- [2, 100, 70, 27]
         
         audio_frame_num = x['audio_frame_num'] # 200
 
-        predictions_video = make_animation(source_image, source_semantics, target_semantics,
+        predictions_video = make_animation(source_image, image_semantics, audio_semantics,
                                         self.generator, self.kp_extractor, self.mapping)
         # predictions_video.size() -- [2, 100, 3, 256, 256]
 

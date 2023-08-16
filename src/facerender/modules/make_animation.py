@@ -73,11 +73,11 @@ def get_rotation_matrix(yaw, pitch, roll):
 
     return rot_mat
 
-def keypoint_transformation(kp_canonical: Dict[str, torch.Tensor], he: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-    # kp_canonical['value'].size() -- [2, 15, 3]
+def keypoint_transformation(canonical_kp: Dict[str, torch.Tensor], he: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    # canonical_kp['value'].size() -- [2, 15, 3]
     # he.keys() -- ['yaw', 'pitch', 'roll', 't', 'exp']
 
-    kp = kp_canonical['value']    # (bs, k, 3) 
+    kp = canonical_kp['value']    # (bs, k, 3) 
     yaw, pitch, roll= he['yaw'], he['pitch'], he['roll']
     # he['yaw'].size() --[2, 66]
 
@@ -114,39 +114,40 @@ def keypoint_transformation(kp_canonical: Dict[str, torch.Tensor], he: Dict[str,
     return {'value': kp_transformed}
 
 # xxxx8888 **************************************************************
-def make_animation(source_image, source_semantics, target_semantics, generator, kp_detector, mapping):
+def make_animation(source_image, image_semantics, audio_semantics, generator, kp_detector, mapping):
     with torch.no_grad():
         predictions = []
 
         # source_image.size() -- [2, 3, 256, 256]
-        # source_semantics.size() -- [2, 70, 27]
-        # target_semantics.size() -- [2, 100, 70, 27]
+        # image_semantics.size() -- [2, 70, 27]
+        # audio_semantics.size() -- [2, 100, 70, 27]
 
         # kp_detector -- KPDetector(...)
-        kp_canonical = kp_detector(source_image) # kp_canonical['value'].size() -- [2, 15, 3]
+        canonical_kp = kp_detector(source_image) # canonical_kp['value'].size() -- [2, 15, 3]
 
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # mapping -- MappingNet(...)            
-        he_source = mapping(source_semantics) # head estimation rotation matrix ?
+        he_source = mapping(image_semantics) # head estimation rotation matrix ?
         # he_source.keys() -- ['yaw', 'pitch', 'roll', 't', 'exp']
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
+        # xxxx7777 Step 3
+        image_kp = keypoint_transformation(canonical_kp, he_source) 
 
-        kp_source = keypoint_transformation(kp_canonical, he_source) 
-
-        for frame_idx in tqdm(range(target_semantics.shape[1]), 'Face Renderer:'):
+        # xxxx9999 Step 4
+        for frame_idx in tqdm(range(audio_semantics.shape[1]), 'Face Renderer:'):
             # still check the dimension
-            target_semantics_frame = target_semantics[:, frame_idx]
-            he_driving = mapping(target_semantics_frame)
-            kp_driving = keypoint_transformation(kp_canonical, he_driving)
+            audio_semantics_frame = audio_semantics[:, frame_idx]
+            he_driving = mapping(audio_semantics_frame)
+            audio_kp = keypoint_transformation(canonical_kp, he_driving)
 
             # generator -- SADKernel(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # source_image.size() -- [2, 3, 256, 256]
-            # kp_source['value'].size() -- [2, 15, 3]
-            # kp_driving['value'].size() -- [2, 15, 3]
+            # image_kp['value'].size() -- [2, 15, 3]
+            # audio_kp['value'].size() -- [2, 15, 3]
 
             # generator -- SADKernel(...)
-            out = generator(source_image, kp_source=kp_source, kp_driving=kp_driving)
+            out = generator(source_image, audio_kp=audio_kp, image_kp=image_kp)
             
             # out.keys() -- ['mask', 'occlusion_map', 'prediction']
             # out['prediction'].size() -- [2, 3, 256, 256]
