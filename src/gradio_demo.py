@@ -1,7 +1,7 @@
 import torch, uuid
 import os, sys, shutil
 from src.utils.preprocess import CropAndExtract
-from src.test_audio2coeff import Audio2Coeff  
+from src.audio2coeff import AudioCoeffModel  
 from src.facerender.animate import AnimateFromCoeff
 from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
@@ -46,7 +46,7 @@ class SadTalker():
         self.sadtalker_paths = init_path(self.checkpoint_path, self.config_path, size, False, preprocess)
         print(self.sadtalker_paths)
             
-        self.audio_to_coeff = Audio2Coeff(self.sadtalker_paths, self.device)
+        self.audio_to_coeff = AudioCoeffModel(self.sadtalker_paths, self.device)
         self.preprocess_model = CropAndExtract(self.sadtalker_paths, self.device)
         self.animate_from_coeff = AnimateFromCoeff(self.sadtalker_paths, self.device)
 

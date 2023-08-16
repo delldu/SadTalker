@@ -15,8 +15,7 @@ from src.utils.debug import debug_var
 import pdb
 
 # xxxx8888 *************************************************************************
-# AudioCoeffModel
-class Audio2Coeff():
+class AudioCoeffModel():
     '''
         ==> (200, 70) --70 = pose(6) + exp(64)
     '''
@@ -34,6 +33,7 @@ class Audio2Coeff():
             checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
             self.audio2pose_model.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2pose', 
                 skip_key1='netG.encoder.', skip_key2='netD_motion.seq.'))
+            torch.save(self.audio2pose_model.state_dict(), "/tmp/Audio2Pose.pth") # xxxx3333
         except:
             raise Exception("Failed in loading audio2pose_checkpoint")
 
@@ -45,14 +45,15 @@ class Audio2Coeff():
         try:
             checkpoints = safetensors.torch.load_file(sadtalker_path['checkpoint'])
             self.audio2exp_model.netG.load_state_dict(load_x_from_safetensor(checkpoints, 'audio2exp'))
+            torch.save(self.audio2exp_model.state_dict(), "/tmp/Audio2Exp.pth") # xxxx3333
         except:
             raise Exception("Failed in loading audio2exp_checkpoint")
 
         self.device = device
 
     def generate(self, batch, coeff_save_dir, pose_style):
-        # debug_var("Audio2Coeff.batch", batch)
-        # Audio2Coeff.batch is dict:
+        # debug_var("AudioCoeffModel.batch", batch)
+        # AudioCoeffModel.batch is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
         #     audio_num_frames value: 200

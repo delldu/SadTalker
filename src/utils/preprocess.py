@@ -6,7 +6,7 @@ from PIL import Image
 import safetensors.torch 
 from src.face3d.util.preprocess import align_img
 from src.face3d.util.load_mats import load_lm3d
-from src.face3d.models import networks
+from src.face3d.models import image2coeff # networks
 
 from scipy.io import savemat
 from src.utils.croper import Preprocesser
@@ -41,11 +41,12 @@ class CropAndExtract(): # xxxx8888
     def __init__(self, sadtalker_path, device):
 
         self.propress = Preprocesser(device)
-        self.net_recon = networks.ImageCoeffModel(net_recon='resnet50', use_last_fc=False, init_path='').to(device)
+        self.net_recon = image2coeff.ImageCoeffModel(net_recon='resnet50', use_last_fc=False).to(device)
         
         # sadtalker_path['checkpoint'] -- './checkpoints/SadTalker_V0.0.2_256.safetensors'
         checkpoint = safetensors.torch.load_file(sadtalker_path['checkpoint'])    
         self.net_recon.load_state_dict(load_x_from_safetensor(checkpoint, 'face_3drecon'))
+        torch.save(self.net_recon.state_dict(), "/tmp/ImageCoeffModel.pth") # xxxx3333
 
         self.net_recon.eval()
         self.lm3d_std = load_lm3d(sadtalker_path['dir_of_BFM_fitting']) # shape (5, 3)

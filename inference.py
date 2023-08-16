@@ -6,7 +6,7 @@ import os, sys, time
 from argparse import ArgumentParser
 
 from src.utils.preprocess import CropAndExtract
-from src.test_audio2coeff import Audio2Coeff  
+from src.audio2coeff import AudioCoeffModel  
 from src.facerender.animate import AnimateFromCoeff
 from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
@@ -31,7 +31,7 @@ def main(args):
     #init model
     preprocess_model = CropAndExtract(sadtalker_paths, device)
 
-    audio_to_coeff = Audio2Coeff(sadtalker_paths,  device)
+    audio_to_coeff = AudioCoeffModel(sadtalker_paths,  device)
     
     animate_from_coeff = AnimateFromCoeff(sadtalker_paths, device)
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument("--result_dir", default='./results', help="path to output")
     parser.add_argument("--pose_style", type=int, default=0,  help="input pose style from [0, 46)")
     parser.add_argument("--batch_size", type=int, default=2,  help="the batch size of facerender")
-    parser.add_argument("--size", type=int, default=256,  help="the image size of the facerender")
+    parser.add_argument("--size", type=int, default=512,  help="the image size of the facerender")
     parser.add_argument("--expression_scale", type=float, default=1.,  help="the batch size of facerender")
     parser.add_argument("--cpu", dest="cpu", action="store_true") 
     parser.add_argument("--preprocess", default='crop', choices=['crop', 'extcrop', 'resize', 'full', 'extfull'], help="how to preprocess the images" ) 

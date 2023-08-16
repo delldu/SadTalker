@@ -1,8 +1,8 @@
-from scipy.spatial import ConvexHull
 import torch
 import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm 
+from typing import Dict
 import pdb
 
 def headpose_pred_to_degree(pred):
@@ -73,7 +73,7 @@ def get_rotation_matrix(yaw, pitch, roll):
 
     return rot_mat
 
-def keypoint_transformation(kp_canonical, he):
+def keypoint_transformation(kp_canonical: Dict[str, torch.Tensor], he: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
     # kp_canonical['value'].size() -- [2, 15, 3]
     # he.keys() -- ['yaw', 'pitch', 'roll', 't', 'exp']
 
@@ -122,7 +122,7 @@ def make_animation(source_image, source_semantics, target_semantics, generator, 
         # source_semantics.size() -- [2, 70, 27]
         # target_semantics.size() -- [2, 100, 70, 27]
 
-        # kp_detector -- KeypointDetector(...)
+        # kp_detector -- KPDetector(...)
         kp_canonical = kp_detector(source_image) # kp_canonical['value'].size() -- [2, 15, 3]
 
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -139,13 +139,13 @@ def make_animation(source_image, source_semantics, target_semantics, generator, 
             he_driving = mapping(target_semantics_frame)
             kp_driving = keypoint_transformation(kp_canonical, he_driving)
 
-            # generator -- OcclusionAwareSPADEGenerator(...)
+            # generator -- SADKernel(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # source_image.size() -- [2, 3, 256, 256]
             # kp_source['value'].size() -- [2, 15, 3]
             # kp_driving['value'].size() -- [2, 15, 3]
 
-            # generator -- OcclusionAwareSPADEGenerator(...)
+            # generator -- SADKernel(...)
             out = generator(source_image, kp_source=kp_source, kp_driving=kp_driving)
             
             # out.keys() -- ['mask', 'occlusion_map', 'prediction']

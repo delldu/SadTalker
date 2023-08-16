@@ -3,8 +3,53 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from src.utils.debug import debug_var
-
+from typing import Dict
 import pdb
+
+class Audio2Exp(nn.Module):
+    def __init__(self, device):
+        super(Audio2Exp, self).__init__()
+        self.netG = Audio2ExpWrapperV2().to(device)
+        # torch.jit.script(self) ==> batch ???
+        # torch.jit.script(self.netG) ==> OK
+
+    def forward(self, batch: Dict[str, torch.Tensor])->Dict[str, torch.Tensor]:
+        # debug_var("Audio2Exp.batch", batch)
+        # Audio2Exp.batch is dict:
+        #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
+        #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
+        #     audio_num_frames value: 200
+        #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
+        #     audio_name value: 'chinese_news'
+        #     image_name value: 'dell'
+
+        mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]
+        bs = mel_input.shape[0]
+        T = mel_input.shape[1] # [200, 1, 80, 16], T -- batch size
+
+        exp_coeff_pred = []
+
+        for i in tqdm(range(0, T, 10),'audio2exp:'): # every 10 frames
+            current_mel_input = mel_input[:,i:i+10]
+            audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
+
+            image_exp = batch['image_exp_pose'][:, :, :64][:, i:i+10] # size() -- [1, 10, 64]
+            audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
+
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # self.netG -- Audio2ExpWrapperV2(...)
+            curr_exp_coeff_pred  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
+
+            exp_coeff_pred += [curr_exp_coeff_pred]
+
+        # BS x T x 64
+        results_dict = {
+            'exp_coeff_pred': torch.cat(exp_coeff_pred, axis=1) # size() -- [1, 200, 64]
+            }
+        
+        return results_dict
+
 
 class Conv2d(nn.Module):
     def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True, *args, **kwargs):
@@ -63,49 +108,5 @@ class Audio2ExpWrapperV2(nn.Module):
         out = y.reshape(image_exp.shape[0], image_exp.shape[1], -1) # size() -- [1, 10, 64]
 
         return out
-
-
-class Audio2Exp(nn.Module):
-    def __init__(self, device):
-        super(Audio2Exp, self).__init__()
-        self.device = device
-        self.netG = Audio2ExpWrapperV2().to(device)
-
-    def forward(self, batch):
-        # debug_var("Audio2Exp.batch", batch)
-        # Audio2Exp.batch is dict:
-        #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
-        #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
-        #     audio_num_frames value: 200
-        #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
-        #     audio_name value: 'chinese_news'
-        #     image_name value: 'dell'
-
-        mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]
-        bs = mel_input.shape[0]
-        T = mel_input.shape[1] # [200, 1, 80, 16], T -- batch size
-
-        exp_coeff_pred = []
-
-        for i in tqdm(range(0, T, 10),'audio2exp:'): # every 10 frames
-            current_mel_input = mel_input[:,i:i+10]
-            audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
-
-            image_exp = batch['image_exp_pose'][:, :, :64][:, i:i+10] # size() -- [1, 10, 64]
-            audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
-
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # self.netG -- Audio2ExpWrapperV2(...)
-            curr_exp_coeff_pred  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
-
-            exp_coeff_pred += [curr_exp_coeff_pred]
-
-        # BS x T x 64
-        results_dict = {
-            'exp_coeff_pred': torch.cat(exp_coeff_pred, axis=1) # size() -- [1, 200, 64]
-            }
-        
-        return results_dict
 
 

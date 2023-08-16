@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from collections import OrderedDict
 from abc import ABC, abstractmethod
-from . import networks
 
 
 class BaseModel(ABC):

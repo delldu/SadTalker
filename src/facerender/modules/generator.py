@@ -2,52 +2,14 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from src.facerender.modules.util import SameBlock2d, DownBlock2d, ResBlock3d, SPADEResnetBlock
+
 from src.facerender.modules.dense_motion import DenseMotionNetwork
+from typing import Dict
 import pdb
-
-
-class SPADEDecoder(nn.Module):
-    def __init__(self):
-        super().__init__()
-        ic = 256
-        oc = 64
-        label_nc = 256
-        norm_G = 'spadespectralinstance'
-        
-        self.fc = nn.Conv2d(ic, 2 * ic, 3, padding=1)
-        self.G_middle_0 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_1 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_2 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_3 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_4 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_5 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.up_0 = SPADEResnetBlock(2 * ic, ic, norm_G, label_nc)
-        self.up_1 = SPADEResnetBlock(ic, oc, norm_G, label_nc)
-        self.conv_img = nn.Conv2d(oc, 3, 3, padding=1)
-        self.up = nn.Upsample(scale_factor=2)
-        
-    def forward(self, feature):
-        seg = feature
-        x = self.fc(feature)
-        x = self.G_middle_0(x, seg)
-        x = self.G_middle_1(x, seg)
-        x = self.G_middle_2(x, seg)
-        x = self.G_middle_3(x, seg)
-        x = self.G_middle_4(x, seg)
-        x = self.G_middle_5(x, seg)
-        x = self.up(x)                
-        x = self.up_0(x, seg)         # 256, 128, 128
-        x = self.up(x)                
-        x = self.up_1(x, seg)         # 64, 256, 256
-
-        x = self.conv_img(F.leaky_relu(x, 2e-1))
-        x = F.sigmoid(x)
-        
-        return x
 
 # comes from "first order motion" ?
 # xxxx8888 **********************************************
-class OcclusionAwareSPADEGenerator(nn.Module):
+class SADKernel(nn.Module):
     '''
     src/config/facerender.yaml
       generator_params:
@@ -74,7 +36,7 @@ class OcclusionAwareSPADEGenerator(nn.Module):
                  # dense_motion_params=None,
                  # estimate_jacobian=False, 
                 ):
-        super(OcclusionAwareSPADEGenerator, self).__init__()
+        super(SADKernel, self).__init__()
         self.dense_motion_network = DenseMotionNetwork(num_kp=num_kp, feature_channel=feature_channel)
 
         self.first = SameBlock2d(image_channel, block_expansion, kernel_size=(3, 3), padding=(1, 1))
@@ -100,6 +62,11 @@ class OcclusionAwareSPADEGenerator(nn.Module):
         self.fourth = nn.Conv2d(in_channels=out_features, out_channels=out_features, kernel_size=1, stride=1)
 
         self.decoder = SPADEDecoder()
+        # torch.jit.script(self) ==> Error !
+        # torch.jit.script(self.decoder) ==> AttributeError: 'SpectralNorm' object has no attribute '__name__'
+        # torch.jit.script(self.third)
+        # torch.jit.script(self.fourth)
+
 
     def deform_input(self, inp, deformation):
         _, d_old, h_old, w_old, _ = deformation.shape
@@ -110,7 +77,7 @@ class OcclusionAwareSPADEGenerator(nn.Module):
             deformation = deformation.permute(0, 2, 3, 4, 1)
         return F.grid_sample(inp, deformation, align_corners=False)
 
-    def forward(self, source_image, kp_driving, kp_source):
+    def forward(self, source_image, kp_driving, kp_source) -> Dict[str, torch.Tensor]:
         # Encoding (downsampling) part
         out = self.first(source_image)
         for i in range(len(self.down_blocks)):
@@ -155,3 +122,43 @@ class OcclusionAwareSPADEGenerator(nn.Module):
         output_dict["prediction"] = out # size() -- [2, 3, 256, 256]
 
         return output_dict
+
+class SPADEDecoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        ic = 256
+        oc = 64
+        label_nc = 256
+        norm_G = 'spadespectralinstance'
+        
+        self.fc = nn.Conv2d(ic, 2 * ic, 3, padding=1)
+        self.G_middle_0 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
+        self.G_middle_1 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
+        self.G_middle_2 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
+        self.G_middle_3 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
+        self.G_middle_4 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
+        self.G_middle_5 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
+        self.up_0 = SPADEResnetBlock(2 * ic, ic, norm_G, label_nc)
+        self.up_1 = SPADEResnetBlock(ic, oc, norm_G, label_nc)
+        self.conv_img = nn.Conv2d(oc, 3, 3, padding=1)
+        self.up = nn.Upsample(scale_factor=2)
+        
+    def forward(self, feature):
+        seg = feature
+        x = self.fc(feature)
+        x = self.G_middle_0(x, seg)
+        x = self.G_middle_1(x, seg)
+        x = self.G_middle_2(x, seg)
+        x = self.G_middle_3(x, seg)
+        x = self.G_middle_4(x, seg)
+        x = self.G_middle_5(x, seg)
+        x = self.up(x)                
+        x = self.up_0(x, seg)         # 256, 128, 128
+        x = self.up(x)                
+        x = self.up_1(x, seg)         # 64, 256, 256
+
+        x = self.conv_img(F.leaky_relu(x, 2e-1))
+        x = F.sigmoid(x)
+        
+        return x
+

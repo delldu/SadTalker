@@ -8,9 +8,9 @@ import safetensors.torch
 import imageio
 import torch
 
-from src.facerender.modules.keypoint_detector import KeypointDetector
+from src.facerender.modules.keypoint_detector import KPDetector
 from src.facerender.modules.mapping import MappingNet
-from src.facerender.modules.generator import OcclusionAwareSPADEGenerator
+from src.facerender.modules.generator import SADKernel
 from src.facerender.modules.make_animation import make_animation 
 
 from pydub import AudioSegment  # xxxx8888
@@ -31,10 +31,10 @@ class AnimateFromCoeff():
     def __init__(self, sadtalker_path, device):
         self.device = device
 
-        self.generator = OcclusionAwareSPADEGenerator().to(device)
+        self.generator = SADKernel().to(device)
         self.generator.eval()
 
-        self.kp_extractor = KeypointDetector().to(device)
+        self.kp_extractor = KPDetector().to(device)
         self.kp_extractor.eval()
 
         self.mapping = MappingNet().to(device)
@@ -57,8 +57,8 @@ class AnimateFromCoeff():
     def load_cpk_facevid2vid_safetensor(self, checkpoint_path, generator=None, 
                         kp_detector=None, device="cpu"):
         # checkpoint_path = './checkpoints/SadTalker_V0.0.2_256.safetensors'
-        # generator = OcclusionAwareSPADEGenerator(...)
-        # kp_detector = KeypointDetector(...)
+        # generator = SADKernel(...)
+        # kp_detector = KPDetector(...)
 
         checkpoint = safetensors.torch.load_file(checkpoint_path)
 
@@ -67,12 +67,14 @@ class AnimateFromCoeff():
             if 'generator' in k:
                 x_generator[k.replace('generator.', '')] = v
         generator.load_state_dict(x_generator)
+        torch.save(generator.state_dict(), "/tmp/SADKernel.pth") # xxxx3333
 
         x_generator = {}
         for k,v in checkpoint.items():
             if 'kp_extractor' in k:
                 x_generator[k.replace('kp_extractor.', '')] = v
         kp_detector.load_state_dict(x_generator)
+        torch.save(kp_detector.state_dict(), "/tmp/KPDetector.pth") # xxxx3333
         
 
     def load_cpk_mapping(self, checkpoint_path, mapping, device='cpu'):
@@ -81,6 +83,7 @@ class AnimateFromCoeff():
 
         checkpoint = torch.load(checkpoint_path,  map_location=torch.device(device))
         mapping.load_state_dict(checkpoint['mapping'])
+        torch.save(mapping.state_dict(), "/tmp/MappingNet.pth") # xxxx3333
 
         return checkpoint['epoch'] # 229
 

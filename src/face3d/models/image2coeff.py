@@ -11,31 +11,20 @@ try:
 except ImportError:
     from torch.utils.model_zoo import load_url as load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
-
-
-# def filter_state_dict(state_dict, remove_name='fc'):
-#     new_state_dict = {}
-#     for key in state_dict:
-#         if remove_name in key:
-#             continue
-#         new_state_dict[key] = state_dict[key]
-#     return new_state_dict
+import pdb
 
 
 # xxxx8888 *************************************************************************
 class ImageCoeffModel(nn.Module):
     fc_dim=257
-    def __init__(self, net_recon, use_last_fc=False, init_path=None):
+    def __init__(self, net_recon, use_last_fc=False):
         super(ImageCoeffModel, self).__init__()
         self.use_last_fc = use_last_fc
         if net_recon not in func_dict:
             return  NotImplementedError('network [%s] is not implemented', net_recon)
         func, last_dim = func_dict[net_recon]
         backbone = func(use_last_fc=use_last_fc, num_classes=self.fc_dim)
-        # if init_path and os.path.isfile(init_path):
-        #     state_dict = filter_state_dict(torch.load(init_path, map_location='cpu'))
-        #     backbone.load_state_dict(state_dict)
-        #     print("loading init net_recon %s from %s" %(net_recon, init_path))
+
         self.backbone = backbone
         if not use_last_fc: # True
             self.final_layers = nn.ModuleList([
@@ -50,6 +39,7 @@ class ImageCoeffModel(nn.Module):
             for m in self.final_layers:
                 nn.init.constant_(m.weight, 0.)
                 nn.init.constant_(m.bias, 0.)
+        # torch.jit.script(self) ==> Error, ResNet._forward_impl, 295
 
     def forward(self, x):
         x = self.backbone(x)

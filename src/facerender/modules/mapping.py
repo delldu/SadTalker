@@ -1,9 +1,8 @@
-import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from typing import Dict
+import pdb
 
 class MappingNet(nn.Module):
     '''
@@ -24,7 +23,7 @@ class MappingNet(nn.Module):
         num_kp=15, 
         num_bins=66,
     ):
-        super( MappingNet, self).__init__()
+        super(MappingNet, self).__init__()
 
         self.layer = layer
         self.first = nn.Sequential(
@@ -42,15 +41,15 @@ class MappingNet(nn.Module):
         self.fc_yaw = nn.Linear(descriptor_nc, num_bins)
         self.fc_t = nn.Linear(descriptor_nc, 3)
         self.fc_exp = nn.Linear(descriptor_nc, 3*num_kp)
+        # torch.jit.script(self) ==> Error
 
-    def forward(self, input_3dmm):
+    def forward(self, input_3dmm: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         out = self.first(input_3dmm)
         for i in range(self.layer): # self.layer -- 3
             model = getattr(self, 'encoder' + str(i))
             out = model(out) + out[:,:, 3:-3]
         out = self.pooling(out)
         out = out.view(out.shape[0], -1)
-        #print('out:', out.shape)
 
         yaw = self.fc_yaw(out)
         pitch = self.fc_pitch(out)

@@ -51,7 +51,9 @@ def get_data(image_coeff_path, audio_path, device):
     audio_name = os.path.splitext(os.path.split(audio_path)[-1])[0]
 
 
-    wav = audio.load_wav(audio_path, 16000) 
+    wav = audio.load_wav(audio_path, 16000) # wav.dtype -- dtype=float32
+    # wav.reshape(200, -1).shape -- (200, 640)
+
     wav_length, audio_num_frames = parse_audio_length(len(wav), 16000, 25) # (128000, 200)
     wav = crop_pad_audio(wav, wav_length)
     # array wav shape: (128000,) , min: -1.0112159 , max: 1.0876185

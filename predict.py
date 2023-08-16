@@ -3,7 +3,7 @@ import os
 import shutil
 from argparse import Namespace
 from src.utils.preprocess import CropAndExtract
-from src.test_audio2coeff import Audio2Coeff
+from src.audio2coeff import AudioCoeffModel
 from src.facerender.animate import AnimateFromCoeff
 from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
@@ -25,7 +25,7 @@ class Predictor(BasePredictor):
         self.preprocess_model = CropAndExtract(sadtalker_paths, device
         )
 
-        self.audio_to_coeff = Audio2Coeff(
+        self.audio_to_coeff = AudioCoeffModel(
             sadtalker_paths,
             device,
         )

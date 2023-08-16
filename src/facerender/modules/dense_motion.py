@@ -2,9 +2,9 @@ from torch import nn
 import torch.nn.functional as F
 import torch
 from src.facerender.modules.util import Hourglass, make_coordinate_grid, kp2gaussian
-
 from src.facerender.sync_batchnorm import SynchronizedBatchNorm3d as BatchNorm3d
 
+from typing import Dict
 
 class DenseMotionNetwork(nn.Module):
     """
@@ -88,7 +88,7 @@ class DenseMotionNetwork(nn.Module):
         heatmap = heatmap.unsqueeze(2)         # (bs, num_kp+1, 1, d, h, w)
         return heatmap
 
-    def forward(self, feature, kp_driving, kp_source):
+    def forward(self, feature, kp_driving, kp_source) -> Dict[str, torch.Tensor]:
         bs, _, d, h, w = feature.shape
 
         feature = self.compress(feature)
