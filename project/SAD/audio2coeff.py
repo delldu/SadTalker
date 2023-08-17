@@ -33,10 +33,11 @@ class Audio2Coeff(nn.Module):
     # xxxx9999 Step 2
     def forward(self, batch: Dict[str, torch.Tensor], pose_style:int=0):
         # batch is dict:
-        #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
-        #     tensor image_exp_pose size: [1, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
-        #     audio_num_frames value: 200
-        #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
+        #     tensor [audio_mels] size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5901, device='cuda:0')
+        #     tensor [image_exp_pose] size: [1, 200, 70] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
+        #     [audio_num_frames] value: 200
+        #     tensor [audio_ratio] size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
+        #     tensor [class] size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
 
         with torch.no_grad():
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

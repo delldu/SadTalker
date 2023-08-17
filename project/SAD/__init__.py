@@ -13,6 +13,7 @@
 __version__ = "1.0.0"
 
 import os
+import subprocess
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
@@ -25,6 +26,61 @@ from SAD.sad import SADModel
 from SAD.debug import debug_var
 
 import pdb
+
+
+def runcmd(cmd):
+    try:
+        if 'DEBUG' in os.environ:
+            print("Run command:", " ".join(cmd))
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE) as proc:
+            print(proc.stdout.read().decode(encoding="utf-8"))
+    except (OSError, ValueError):
+        print(f"video encode '{input_dir}'' error.")
+        return False
+    return True
+
+
+def video_encode(input_dir, output_file):
+    if not os.path.exists(input_dir):
+        print(f"Dir {input_dir} not exists.")
+        return False
+
+    # ffmpeg -i output/%6d.png -vcodec png -pix_fmt rgba -y blackswan.mp4
+    cmd = [
+        "ffmpeg",
+        "-i",
+        f"{input_dir}/%6d.png",
+        "-vcodec",
+        "png",
+        "-pix_fmt",
+        "rgba",
+        "-y",
+        output_file,
+    ]
+    return runcmd(cmd)
+
+def video_merge(input_video_file, input_audio_file, output_file):
+    if not os.path.exists(input_video_file):
+        print(f"File {input_video_file} not exists.")
+        return False
+
+    if not os.path.exists(input_audio_file):
+        print(f"File {input_audio_file} not exists.")
+        return False
+
+    # cmd = r'ffmpeg -y -i "%s" -i "%s" -vcodec copy "%s"' % (video, audio, temp_file)
+
+    cmd = [
+        "ffmpeg",
+        "-i",
+        input_video_file,
+        "-i",
+        input_audio_file,
+        "-vcodec",
+        "copy",
+        output_file,
+    ]
+    return runcmd(cmd)
 
 
 def create_model():
@@ -55,22 +111,23 @@ def get_model():
     return model, device
 
 def load_wav(audio_path, new_sample_rate=16000):
-    wav, sample_rate = torchaudio.load(audio_path)
-    wav = torchaudio.functional.resample(wav, orig_freq=sample_rate, new_freq=new_sample_rate)[0]
+    waveform, sample_rate = torchaudio.load(audio_path)
+    waveform = torchaudio.functional.resample(waveform, orig_freq=sample_rate, new_freq=new_sample_rate)
+    waveform = waveform[0] # half is enough for application
 
     # Parse audio length
     fps = 25
     bit_per_frames = new_sample_rate / fps
-    num_frames = int(len(wav) / bit_per_frames)
+    num_frames = int(len(waveform) / bit_per_frames)
     wav_length = int(num_frames * bit_per_frames)
 
     # Crop pad
-    if len(wav) > wav_length:
-        wav = wav[:wav_length]
-    elif len(wav) < wav_length:
-        wav = torch.pad(wav, [0, wav_length - len(wav)], mode='constant', constant_values=0)
+    if len(waveform) > wav_length:
+        waveform = waveform[:wav_length]
+    elif len(waveform) < wav_length:
+        waveform = torch.pad(waveform, [0, wav_length - len(waveform)], mode='constant', constant_values=0)
 
-    return wav.reshape(num_frames, -1)
+    return waveform.reshape(num_frames, -1)
 
 
 def predict(audio_file, image_file, output_dir):
@@ -97,6 +154,9 @@ def predict(audio_file, image_file, output_dir):
     for i in range(B):
         output_file = f"{output_dir}/{i:06d}.png"
         todos.data.save_tensor([output_tensor[i].unsqueeze(0)], output_file)
+
+    video_encode(f"{output_dir}", f"{output_dir}/sad_video.mp4")
+    video_merge(f"{output_dir}/sad_video.mp4", audio_file, f"{output_dir}/sad.mp4")
 
     todos.model.reset_device()
 

@@ -91,20 +91,19 @@ class SADModel(nn.Module):
         #     [audio_num_frames] value: 200
         #     tensor [audio_ratio] size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
 
-        audio_exp_pose = self.audio2coffe_model(batch, pose_style=0)
+        audio_exp_pose = self.audio2coffe_model(batch, pose_style=0).squeeze(0)
         # tensor [audio_exp_pose] size: [200, 70] , min: tensor(-1.6503, device='cuda:0') , max: tensor(1.3328, device='cuda:0')
-
 
         output_list = []
         for i in tqdm(range(num_frames), 'Face Rendering'):
-            audio_semantics_frame = transform_audio_semantic(audio_exp_pose[0], i) # xxxx8888
-            audio_he = self.mappingnet_model(audio_semantics_frame.unsqueeze(0)) # xxxx8888
+            frame_semantics = transform_audio_semantic(audio_exp_pose, i).unsqueeze(0) # size() -- [1, 70, 27]
+            audio_he = self.mappingnet_model(frame_semantics)
             audio_kp = keypoint_transform(canonical_kp, audio_he)
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # source_image.size() -- [2, 3, 256, 256]
-            # image_kp['value'].size() -- [2, 15, 3]
-            # audio_kp['value'].size() -- [2, 15, 3]
+            # size() -- [1, 3, 512, 512]
+            # audio_kp.size() -- [1, 15, 3]
+            # image_kp.size() -- [1, 15, 3]
 
             # generator -- SADKernel(...)
             y = self.sadkernel_model(image, audio_kp=audio_kp, image_kp=image_kp)
@@ -118,9 +117,8 @@ class SADModel(nn.Module):
         return output
 
     def image_head_estimation(self, image_exp_pose):
-        image_semantic = transform_image_semantic(image_exp_pose).unsqueeze(0)
-        # tensor [image_semantic] size: [1, 70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
-        # std tensor image_semantics size: [2, 70, 27] , min: tensor(-1.0968) , max: tensor(1.1307)
+        image_semantics = transform_image_semantic(image_exp_pose).unsqueeze(0)
+        # tensor [image_semantics] size: [1, 70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
 
-        image_he = self.mappingnet_model(image_semantic)
+        image_he = self.mappingnet_model(image_semantics)
         return image_he        
