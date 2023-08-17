@@ -329,4 +329,6 @@ func_dict = {
 
 if __name__ == "__main__":
     model = Image2Coeff()
+    model = torch.jit.script(model)
     print(model)
+    # ==> OK    

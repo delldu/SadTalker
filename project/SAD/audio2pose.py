@@ -14,7 +14,7 @@ from torch import nn
 from SAD.util import load_weights
 from SAD.debug import debug_var
 
-from typing import Dict
+from typing import Dict, List
 import pdb
 
 class Audio2Pose(nn.Module):
@@ -43,7 +43,7 @@ class Audio2Pose(nn.Module):
         # load_weights(self, "models/Audio2Pose.pth")
 
 
-    def forward(self, x: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, x: Dict[str, torch.Tensor]):
         # debug_var("Audio2Pose.x", x)
         # Audio2Pose.x is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
@@ -52,7 +52,7 @@ class Audio2Pose(nn.Module):
         #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
         #     tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')
 
-        batch = {}
+        batch: Dict[str, torch.Tensor] = {}
         image_exp_pose = x['image_exp_pose'] # size() -- [1, 200, 70]
         batch['image_pose'] = x['image_exp_pose'][:, 0, -6:]  # [1, 200, 70] ==> [1, 6]
         batch['class'] = x['class'] # tensor([0], device='cuda:0')
@@ -65,7 +65,7 @@ class Audio2Pose(nn.Module):
 
         div = audio_num_frames//self.seq_len
         re = audio_num_frames%self.seq_len
-        pose_pred_list = [torch.zeros(batch['image_pose'].unsqueeze(1).shape, 
+        pose_pred_list: List[torch.Tensor] = [torch.zeros(batch['image_pose'].unsqueeze(1).shape, 
                                 dtype=batch['image_pose'].dtype, 
                                 device=batch['image_pose'].device)]
 
@@ -290,7 +290,7 @@ class CVAE(nn.Module):
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
         # torch.jit.script(self) ==> Error, 210
 
-    def forward(self, batch):
+    def forward(self, batch: Dict[str, torch.Tensor]):
         '''
         class_id = batch['class']
         z = torch.randn([class_id.size(0), self.latent_size]).to(class_id.device)
@@ -322,7 +322,7 @@ class Decoder(nn.Module):
 
         self.classbias = nn.Parameter(torch.randn(self.num_classes, latent_size))
 
-    def forward(self, batch):
+    def forward(self, batch: Dict[str, torch.Tensor]):
         # debug_var("Decoder.batch", batch)
         # Decoder.batch is dict:
         #     tensor image_pose size: [1, 6] , min: tensor(-0.0195, device='cuda:0') , max: tensor(0.2540, device='cuda:0')
@@ -353,4 +353,6 @@ class Decoder(nn.Module):
 
 if __name__ == "__main__":
     model = Audio2Pose()
+    model = torch.jit.script(model)    
     print(model)
+    # ==> OK

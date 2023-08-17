@@ -58,4 +58,6 @@ class Audio2Coeff(nn.Module):
 
 if __name__ == "__main__":
     model = Audio2Coeff()
+    model = torch.jit.script(model)    
     print(model)
+    # ==> OK

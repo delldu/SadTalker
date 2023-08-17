@@ -47,15 +47,7 @@ def video_encode(input_dir, output_file):
 
     # ffmpeg -i output/%6d.png -vcodec png -pix_fmt rgba -y blackswan.mp4
     cmd = [
-        "ffmpeg",
-        "-i",
-        f"{input_dir}/%6d.png",
-        "-vcodec",
-        "png",
-        "-pix_fmt",
-        "rgba",
-        "-y",
-        output_file,
+        "ffmpeg", "-y", "-i", f"{input_dir}/%6d.png", "-vcodec", "png", "-pix_fmt", "rgba", output_file,
     ]
     return runcmd(cmd)
 
@@ -69,16 +61,8 @@ def video_merge(input_video_file, input_audio_file, output_file):
         return False
 
     # cmd = r'ffmpeg -y -i "%s" -i "%s" -vcodec copy "%s"' % (video, audio, temp_file)
-
     cmd = [
-        "ffmpeg",
-        "-i",
-        input_video_file,
-        "-i",
-        input_audio_file,
-        "-vcodec",
-        "copy",
-        output_file,
+        "ffmpeg", "-y", "-i", input_video_file, "-i", input_audio_file, "-vcodec", "copy", output_file,
     ]
     return runcmd(cmd)
 
@@ -103,7 +87,7 @@ def get_model():
     model, device = create_model()
     # print(model)
 
-    # model = torch.jit.script(model)
+    # model = torch.jit.script(model) # xxxx8888
     # todos.data.mkdir("output")
     # if not os.path.exists("output/SAD.torch"):
     #     model.save("output/SAD.torch")

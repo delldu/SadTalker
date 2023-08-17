@@ -55,13 +55,17 @@ class MappingNet(nn.Module):
 
         # load_weights(self, "models/MappingNet.pth")
 
-        # torch.jit.script(self) ==> Error
-
-    def forward(self, input_3dmm: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward(self, input_3dmm) -> Dict[str, torch.Tensor]:
         out = self.first(input_3dmm)
-        for i in range(self.layer): # self.layer -- 3
-            model = getattr(self, 'encoder' + str(i))
-            out = model(out) + out[:,:, 3:-3]
+
+        # to support torch.jit.script
+        # for i in range(self.layer): # self.layer -- 3
+        #     model = getattr(self, 'encoder' + str(i))
+        #     out = model(out) + out[:,:, 3:-3]
+        out = self.encoder0(out) + out[:,:, 3:-3]
+        out = self.encoder1(out) + out[:,:, 3:-3]
+        out = self.encoder2(out) + out[:,:, 3:-3]
+
         out = self.pooling(out)
         out = out.view(out.shape[0], -1)
 
@@ -76,4 +80,7 @@ class MappingNet(nn.Module):
 
 if __name__ == "__main__":
     model = MappingNet()
+    model = torch.jit.script(model)    
     print(model)
+    # ==> OK
+

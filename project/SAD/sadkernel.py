@@ -94,8 +94,12 @@ class SADKernel(nn.Module):
     def forward(self, source_image, audio_kp, image_kp):
         # Encoding (downsampling) part
         out = self.first(source_image)
-        for i in range(len(self.down_blocks)):
-            out = self.down_blocks[i](out)
+
+        # for i in range(len(self.down_blocks)):
+        #     out = self.down_blocks[i](out)
+        for i, m in enumerate(self.down_blocks):
+            out = m(out)
+
         out = self.second(out)
         bs, c, h, w = out.shape
         # print(out.shape)
@@ -218,6 +222,8 @@ class SPADE(nn.Module):
 class SPADEResnetBlock(nn.Module):
     def __init__(self, fin, fout, norm_G, label_nc, dilation=1):
         super().__init__()
+        # norm_G === 'spadespectralinstance'
+
         # Attributes
         self.learned_shortcut = (fin != fout)
         fmiddle = min(fin, fout)
@@ -281,4 +287,5 @@ class ResBlock3d(nn.Module):
 
 if __name__ == "__main__":
     model = SADKernel()
+    model = torch.jit.script(model)    
     print(model)

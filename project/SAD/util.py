@@ -14,7 +14,7 @@ import os
 import torch
 from torch import nn
 import torch.nn.functional as F
-from typing import Dict
+from typing import Dict, Tuple
 import pdb
 
 def load_weights(model, model_path):
@@ -28,12 +28,17 @@ def load_weights(model, model_path):
         print("-" * 32, "Warnning", "-" * 32)
         print(f"Model weight file '{checkpoint}' not exist !!!")
 
-
-def make_coordinate_grid(spatial_size, type):
+# def make_coordinate_grid(spatial_size: Tuple[int, int, int], to_type:str):
+#     d, h, w = spatial_size
+#     x = torch.arange(w).type(to_type)
+#     y = torch.arange(h).type(to_type)
+#     z = torch.arange(d).type(to_type)
+# xxxx8888
+def make_coordinate_grid(spatial_size: Tuple[int, int, int]):
     d, h, w = spatial_size
-    x = torch.arange(w).type(type)
-    y = torch.arange(h).type(type)
-    z = torch.arange(d).type(type)
+    x = torch.arange(w)
+    y = torch.arange(h)
+    z = torch.arange(d)
 
     x = (2 * (x / (w - 1)) - 1)
     y = (2 * (y / (h - 1)) - 1)
@@ -46,7 +51,6 @@ def make_coordinate_grid(spatial_size, type):
     meshed = torch.cat([xx.unsqueeze_(3), yy.unsqueeze_(3), zz.unsqueeze_(3)], 3)
 
     return meshed
-
 
 
 def headpose_pred_to_degree(pred):
@@ -191,7 +195,7 @@ class UpBlock3d(nn.Module):
 
     def forward(self, x):
         # out = F.interpolate(x, scale_factor=(1, 2, 2), mode='trilinear')
-        out = F.interpolate(x, scale_factor=(1, 2, 2))
+        out = F.interpolate(x, scale_factor=(1.0, 2.0, 2.0))
         out = self.conv(out)
         out = self.norm(out)
         out = F.relu(out)

@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from SAD.util import make_coordinate_grid, UpBlock3d
-from typing import Dict
+from typing import Dict, List, Tuple
 import pdb
 
 class DenseMotionNetwork(nn.Module):
@@ -53,19 +53,11 @@ class DenseMotionNetwork(nn.Module):
 
     def create_sparse_motions(self, feature, audio_kp, image_kp):
         bs, _, d, h, w = feature.shape
-        identity_grid = make_coordinate_grid((d, h, w), type=image_kp.type())
+        # identity_grid = make_coordinate_grid((d, h, w), image_kp.type()).to(feature.device)
+        identity_grid = make_coordinate_grid((d, h, w)).to(feature.device)
         identity_grid = identity_grid.view(1, 1, d, h, w, 3)
         coordinate_grid = identity_grid - audio_kp.view(bs, self.num_kp, 1, 1, 1, 3)
         
-        # # if 'jacobian' in audio_kp:
-        # if 'jacobian' in audio_kp and audio_kp['jacobian'] is not None:
-        #     jacobian = torch.matmul(image_kp['jacobian'], torch.inverse(audio_kp['jacobian']))
-        #     jacobian = jacobian.unsqueeze(-3).unsqueeze(-3).unsqueeze(-3)
-        #     jacobian = jacobian.repeat(1, 1, d, h, w, 1, 1)
-        #     coordinate_grid = torch.matmul(jacobian, coordinate_grid.unsqueeze(-1))
-        #     coordinate_grid = coordinate_grid.squeeze(-1)                  
-
-
         driving_to_source = coordinate_grid + image_kp.view(bs, self.num_kp, 1, 1, 1, 3)    # (bs, num_kp, d, h, w, 3)
 
         #adding background feature
@@ -86,7 +78,7 @@ class DenseMotionNetwork(nn.Module):
         return sparse_deformed
 
     def create_heatmap_representations(self, feature, audio_kp, image_kp):
-        spatial_size = feature.shape[3:]
+        spatial_size: Tuple[int, int, int] = (feature.shape[3], feature.shape[4], feature.shape[5])
         gaussian_driving = kp2gaussian(audio_kp, spatial_size=spatial_size, kp_variance=0.01)
         gaussian_source = kp2gaussian(image_kp, spatial_size=spatial_size, kp_variance=0.01)
         heatmap = gaussian_driving - gaussian_source
@@ -183,7 +175,13 @@ class Decoder(nn.Module):
         self.conv = nn.Conv3d(in_channels=self.out_filters, out_channels=self.out_filters, kernel_size=3, padding=1)
         self.norm = nn.BatchNorm3d(self.out_filters, affine=True)
 
-    def forward(self, x):
+    def forward(self, x: List[torch.Tensor]):
+        # (Pdb) x[0].size() torch.Size([1, 80, 16, 128, 128])
+        # (Pdb) x[1].size() torch.Size([1, 64, 16, 64, 64])
+        # (Pdb) x[2].size() torch.Size([1, 128, 16, 32, 32])
+        # (Pdb) x[3].size() torch.Size([1, 256, 16, 16, 16])
+        # (Pdb) x[4].size() torch.Size([1, 512, 16, 8, 8])
+        # (Pdb) x[5].size() torch.Size([1, 1024, 16, 4, 4])
         out = x.pop()
         # for up_block in self.up_blocks[:-1]:
         for up_block in self.up_blocks:
@@ -210,25 +208,21 @@ class Hourglass(nn.Module):
     def forward(self, x):
         return self.decoder(self.encoder(x))
 
-def kp2gaussian(kp, spatial_size, kp_variance):
+def kp2gaussian(kp, spatial_size: Tuple[int, int, int], kp_variance: float):
     """
     Transform a keypoint into gaussian like representation
     """
-    mean = kp
+    mean = kp # size() -- [1, 15, 3]
 
-    coordinate_grid = make_coordinate_grid(spatial_size, mean.type())
-    number_of_leading_dimensions = len(mean.shape) - 1
-    shape = (1,) * number_of_leading_dimensions + coordinate_grid.shape
-    coordinate_grid = coordinate_grid.view(*shape)
-    repeats = mean.shape[:number_of_leading_dimensions] + (1, 1, 1, 1)
-    coordinate_grid = coordinate_grid.repeat(*repeats)
+    # coordinate_grid = make_coordinate_grid(spatial_size, mean.type()).to(kp.device) # [16, 128, 128, 3]
+    coordinate_grid = make_coordinate_grid(spatial_size).to(kp.device) # [16, 128, 128, 3]
+    coordinate_grid = coordinate_grid.unsqueeze(0).unsqueeze(0) # [1, 1, 16, 128, 128, 3]
+    coordinate_grid = coordinate_grid.repeat(1, 15, 1, 1, 1, 1)
 
     # Preprocess kp shape
-    shape = mean.shape[:number_of_leading_dimensions] + (1, 1, 1, 3)
-    mean = mean.view(*shape)
+    mean = mean.unsqueeze(2).unsqueeze(2).unsqueeze(2) # [1, 15, 3] ==> [1, 15, 1, 1, 1, 3]
 
     mean_sub = (coordinate_grid - mean)
-
     out = torch.exp(-0.5 * (mean_sub ** 2).sum(-1) / kp_variance)
 
     return out
@@ -252,3 +246,8 @@ class DownBlock3d(nn.Module):
         out = self.pool(out)
         return out
 
+if __name__ == "__main__":
+    model = DenseMotionNetwork()
+    model = torch.jit.script(model)
+    print(model)
+    # ==> OK    

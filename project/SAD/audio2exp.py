@@ -13,7 +13,7 @@ from torch import nn
 from SAD.util import load_weights
 from SAD.debug import debug_var
 
-from typing import Dict
+from typing import Dict, List
 import pdb
 
 class Audio2Exp(nn.Module):
@@ -26,7 +26,7 @@ class Audio2Exp(nn.Module):
         # torch.jit.script(self) ==> batch ???
         # torch.jit.script(self.netG) ==> OK
 
-    def forward(self, batch: Dict[str, torch.Tensor])->Dict[str, torch.Tensor]:
+    def forward(self, batch: Dict[str, torch.Tensor]):
         # debug_var("Audio2Exp.batch", batch)
         # Audio2Exp.batch is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
@@ -37,7 +37,7 @@ class Audio2Exp(nn.Module):
         mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]
         T = mel_input.shape[1] # [200, 1, 80, 16], T -- batch size
 
-        exp_predict_list = []
+        exp_predict_list: List[torch.Tensor] = []
 
         for i in range(0, T, 10): # every 10 frames
             current_mel_input = mel_input[:,i:i+10]
@@ -54,9 +54,8 @@ class Audio2Exp(nn.Module):
             y  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 
-            exp_predict_list += [y]
-
-        return torch.cat(exp_predict_list, axis=1) # size() -- [1, 200, 64]
+            exp_predict_list += [y] # size() -- [1, 10, 64]
+        return torch.cat(exp_predict_list, dim=1) # size() -- [1, 200, 64]
 
 
 class Conv2d(nn.Module):
@@ -120,4 +119,6 @@ class Audio2ExpWrapperV2(nn.Module):
 
 if __name__ == "__main__":
     model = Audio2Exp()
+    model = torch.jit.script(model)
     print(model)
+    # ==> OK

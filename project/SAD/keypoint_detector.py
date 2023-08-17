@@ -17,7 +17,7 @@ from SAD.util import (
     make_coordinate_grid, 
     load_weights,
 )
-
+from SAD.debug import debug_var
 
 from typing import Dict
 
@@ -76,27 +76,35 @@ class KPDetector(nn.Module):
         # torch.jit.script(self.kp)
         # torch.jit.script(self.down)
 
-    def gaussian2kp(self, heatmap) -> Dict[str, torch.Tensor]:
+    def gaussian2kp(self, heatmap):
         """
         Extract the mean from a heatmap
         """
         shape = heatmap.shape
         heatmap = heatmap.unsqueeze(-1)
-        grid = make_coordinate_grid(shape[2:], heatmap.type()).unsqueeze_(0).unsqueeze_(0)
+
+        # grid = make_coordinate_grid((shape[2],shape[3],shape[4]),
+        #             heatmap.type()).unsqueeze_(0).unsqueeze_(0).to(heatmap.device)
+        # grid = make_coordinate_grid(shape[2:]).unsqueeze_(0).unsqueeze_(0).to(heatmap.device) # xxxx8888
+
+        grid = make_coordinate_grid((shape[2],shape[3],shape[4])).unsqueeze_(0).unsqueeze_(0).to(heatmap.device)
         value = (heatmap * grid).sum(dim=(2, 3, 4))
 
         return value
 
     def forward(self, x):
+        # tensor [x] size: [1, 3, 512, 512] , min: tensor(0.1176, device='cuda:0') , max: tensor(1., device='cuda:0')
         x = self.down(x)
 
         feature_map = self.predictor(x)
         prediction = self.kp(feature_map)
 
-        final_shape = prediction.shape
+        final_shape = prediction.shape # [1, 15, 16, 128, 128]
         heatmap = prediction.view(final_shape[0], final_shape[1], -1)
-        heatmap = F.softmax(heatmap / self.temperature, dim=2)
-        heatmap = heatmap.view(*final_shape)
+        heatmap = F.softmax(heatmap / self.temperature, dim=2) # [1, 15, 262144]
+
+        # heatmap = heatmap.view(*final_shape) # torch.jit.script does not support
+        heatmap = heatmap.reshape(final_shape)
 
         out = self.gaussian2kp(heatmap)
 
@@ -191,4 +199,6 @@ class KPHourglass(nn.Module):
         
 if __name__ == "__main__":
     model = KPDetector()
+    model = torch.jit.script(model)    
     print(model)
+    # ==> OK
