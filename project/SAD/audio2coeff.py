@@ -12,9 +12,6 @@ import os
 import torch
 import torch.nn as nn
 
-from scipy.io import savemat
-from scipy.signal import savgol_filter # xxxx8888
-
 from SAD.audio2pose import Audio2Pose
 from SAD.audio2exp import Audio2Exp
 from SAD.debug import debug_var
@@ -27,10 +24,9 @@ import pdb
 class Audio2Coeff(nn.Module):
     def __init__(self):
         super(Audio2Coeff, self).__init__()
-        self.audio2pose_model = Audio2Pose()
         self.audio2exp_model = Audio2Exp()
+        self.audio2pose_model = Audio2Pose()
 
-    # xxxx9999 Step 2
     def forward(self, batch: Dict[str, torch.Tensor], pose_style:int=0):
         # batch is dict:
         #     tensor [audio_mels] size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5901, device='cuda:0')

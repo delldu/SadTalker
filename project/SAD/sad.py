@@ -57,11 +57,9 @@ class SADModel(nn.Module):
 
         canonical_kp = self.kpdetector_model(image)
         # tensor [canonical_kp] size: [1, 15, 3] , min: tensor(-0.8919, device='cuda:0') , max: tensor(0.9501, device='cuda:0')
-        # orig -- canonical_kp['value'].size() -- [2, 15, 3]
 
         image_exp_pose = self.image2coffe_model(image) # image exp + pose
         # tensor [image_exp_pose] size: [1, 70] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
-        # std array semantic_npy shape: (1, 70) , min: -1.1055539 , max: 1.1102859
         image_he = self.image_head_estimation(image_exp_pose)
         # image_he is dict:
         #     tensor [yaw] size: [1, 66] , min: tensor(-3.9595, device='cuda:0') , max: tensor(4.3973, device='cuda:0')
@@ -75,8 +73,6 @@ class SADModel(nn.Module):
 
         num_frames = audio.shape[0]
         audio_mels = melspectrogram(audio.cpu()).to(audio.device)
-        # tensor [audio_mels] size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5901, device='cuda:0')
-
         audio_ratio = get_blink_seq_randomly(num_frames)
         audio_ratio = audio_ratio.unsqueeze(0).to(audio.device) # [1, 200, 1]
 

@@ -69,8 +69,7 @@ def transform_image_semantic(coeff_3dmm, semantic_radius: int=13):
 
 def transform_audio_semantic(coeff_3dmm, frame_index: int, semantic_radius: int=13):
     # coeff_3dmm shape: (200, 70) , min: -1.6095467 , max: 1.0893884
-
-    audio_num_frames = coeff_3dmm.shape[1]
+    audio_num_frames = coeff_3dmm.shape[0]
     seq = list(range(frame_index- semantic_radius, frame_index + semantic_radius+1))
     # seq -- [-13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 
     #     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]

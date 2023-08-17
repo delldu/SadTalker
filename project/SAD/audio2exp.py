@@ -43,9 +43,12 @@ class Audio2Exp(nn.Module):
             current_mel_input = mel_input[:,i:i+10]
             audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
 
-            image_exp = batch['image_exp_pose'][:, i:i+10, 0:64] # size() -- [1, 10, 64]
-            audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
+            # image_exp = batch['image_exp_pose'][:, i:i+10, 0:64] # size() -- [1, 10, 64]
+            # audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
 
+            image_exp = batch['image_exp_pose'][:, :, :64][:, i:i+10] # size() -- [1, 10, 64]
+            audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
+            
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # self.netG -- Audio2ExpWrapperV2(...)
             y  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
