@@ -87,10 +87,10 @@ def get_model():
     model, device = create_model()
     # print(model)
 
-    # model = torch.jit.script(model) # xxxx8888
-    # todos.data.mkdir("output")
-    # if not os.path.exists("output/SAD.torch"):
-    #     model.save("output/SAD.torch")
+    model = torch.jit.script(model) # xxxx8888
+    todos.data.mkdir("output")
+    if not os.path.exists("output/SAD.torch"):
+        model.save("output/SAD.torch")
 
     return model, device
 

@@ -100,7 +100,7 @@ def torch_melspectrogram(wav):
             n_fft=hp.n_fft, win_length=hp.win_size, hop_length=hp.hop_size,
             power=1, normalized=False, # !!! here two items configuration is very import !!!
         )
-    D = T(wav)
+    D = T(wav) # [401, 641]
     M = torch_linear_to_mel(D)
 
     S = torch_amp_to_db(M) - hp.ref_level_db # hp.ref_level_db -- 20

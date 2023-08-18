@@ -11,13 +11,34 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-import torch.nn.utils.spectral_norm as spectral_norm
-
+from torch.nn.utils import spectral_norm, remove_spectral_norm
 from SAD.dense_motion import DenseMotionNetwork
 from SAD.util import load_weights, DownBlock2d
 
 from typing import Dict
 import pdb
+
+def remove_sadkernel_spectral_norm(model):
+    remove_spectral_norm(model.decoder.G_middle_0.conv_0)
+    remove_spectral_norm(model.decoder.G_middle_0.conv_1)
+    remove_spectral_norm(model.decoder.G_middle_1.conv_0)
+    remove_spectral_norm(model.decoder.G_middle_1.conv_1)
+    remove_spectral_norm(model.decoder.G_middle_2.conv_0)
+    remove_spectral_norm(model.decoder.G_middle_2.conv_1)
+    remove_spectral_norm(model.decoder.G_middle_3.conv_0)
+    remove_spectral_norm(model.decoder.G_middle_3.conv_1)
+    remove_spectral_norm(model.decoder.G_middle_4.conv_0)
+    remove_spectral_norm(model.decoder.G_middle_4.conv_1)
+    remove_spectral_norm(model.decoder.G_middle_5.conv_0)
+    remove_spectral_norm(model.decoder.G_middle_5.conv_1)
+
+    remove_spectral_norm(model.decoder.up_0.conv_0)
+    remove_spectral_norm(model.decoder.up_0.conv_1)
+    remove_spectral_norm(model.decoder.up_0.conv_s)
+    remove_spectral_norm(model.decoder.up_1.conv_0)
+    remove_spectral_norm(model.decoder.up_1.conv_1)
+    remove_spectral_norm(model.decoder.up_1.conv_s)    
+
 
 # comes from "first order motion" ?
 class SADKernel(nn.Module):
@@ -234,10 +255,10 @@ class SPADEResnetBlock(nn.Module):
         self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=dilation, dilation=dilation)
         self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=dilation, dilation=dilation)
 
-        # apply spectral norm if specified
-        if 'spectral' in norm_G: # xxxx8888
-            self.conv_0 = spectral_norm(self.conv_0)
-            self.conv_1 = spectral_norm(self.conv_1)
+        # apply spectral norm if specified, xxxx8888
+        self.conv_0 = spectral_norm(self.conv_0)
+        self.conv_1 = spectral_norm(self.conv_1)
+
         # define normalization layers
         self.norm_0 = SPADE(fin, label_nc)
         self.norm_1 = SPADE(fmiddle, label_nc)
@@ -273,10 +294,11 @@ class ShortcutSPADEResnetBlock(nn.Module):
         self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
 
         # apply spectral norm if specified
-        if 'spectral' in norm_G: # xxxx8888
-            self.conv_0 = spectral_norm(self.conv_0)
-            self.conv_1 = spectral_norm(self.conv_1)
-            self.conv_s = spectral_norm(self.conv_s)
+        # xxxx8888
+        self.conv_0 = spectral_norm(self.conv_0)
+        self.conv_1 = spectral_norm(self.conv_1)
+        self.conv_s = spectral_norm(self.conv_s)
+
         # define normalization layers
         self.norm_0 = SPADE(fin, label_nc)
         self.norm_1 = SPADE(fmiddle, label_nc)
@@ -323,5 +345,7 @@ class ResBlock3d(nn.Module):
 
 if __name__ == "__main__":
     model = SADKernel()
+
+    remove_sadkernel_spectral_norm(model)
     model = torch.jit.script(model)    
     print(model)

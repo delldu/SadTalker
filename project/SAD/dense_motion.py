@@ -53,7 +53,6 @@ class DenseMotionNetwork(nn.Module):
 
     def create_sparse_motions(self, feature, audio_kp, image_kp):
         bs, _, d, h, w = feature.shape
-        # identity_grid = make_coordinate_grid((d, h, w), image_kp.type()).to(feature.device)
         identity_grid = make_coordinate_grid((d, h, w)).to(feature.device)
         identity_grid = identity_grid.view(1, 1, d, h, w, 3)
         coordinate_grid = identity_grid - audio_kp.view(bs, self.num_kp, 1, 1, 1, 3)
@@ -214,7 +213,6 @@ def kp2gaussian(kp, spatial_size: Tuple[int, int, int], kp_variance: float):
     """
     mean = kp # size() -- [1, 15, 3]
 
-    # coordinate_grid = make_coordinate_grid(spatial_size, mean.type()).to(kp.device) # [16, 128, 128, 3]
     coordinate_grid = make_coordinate_grid(spatial_size).to(kp.device) # [16, 128, 128, 3]
     coordinate_grid = coordinate_grid.unsqueeze(0).unsqueeze(0) # [1, 1, 16, 128, 128, 3]
     coordinate_grid = coordinate_grid.repeat(1, 15, 1, 1, 1, 1)

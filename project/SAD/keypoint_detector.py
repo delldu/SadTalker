@@ -83,11 +83,8 @@ class KPDetector(nn.Module):
         shape = heatmap.shape
         heatmap = heatmap.unsqueeze(-1)
 
-        # grid = make_coordinate_grid((shape[2],shape[3],shape[4]),
-        #             heatmap.type()).unsqueeze_(0).unsqueeze_(0).to(heatmap.device)
-        # grid = make_coordinate_grid(shape[2:]).unsqueeze_(0).unsqueeze_(0).to(heatmap.device) # xxxx8888
-
-        grid = make_coordinate_grid((shape[2],shape[3],shape[4])).unsqueeze_(0).unsqueeze_(0).to(heatmap.device)
+        grid = make_coordinate_grid((shape[2],shape[3],
+            shape[4])).unsqueeze_(0).unsqueeze_(0).to(heatmap.device)
         value = (heatmap * grid).sum(dim=(2, 3, 4))
 
         return value

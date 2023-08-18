@@ -14,8 +14,31 @@ import os
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.nn.utils import remove_spectral_norm
+
 from typing import Dict, Tuple
 import pdb
+
+def remove_sadkernel_spectral_norm(model):
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_0.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_0.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_1.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_1.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_2.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_2.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_3.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_3.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_4.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_4.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_5.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.G_middle_5.conv_1)
+
+    remove_spectral_norm(model.sadkernel_model.decoder.up_0.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.up_0.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.up_0.conv_s)
+    remove_spectral_norm(model.sadkernel_model.decoder.up_1.conv_0)
+    remove_spectral_norm(model.sadkernel_model.decoder.up_1.conv_1)
+    remove_spectral_norm(model.sadkernel_model.decoder.up_1.conv_s)   
 
 def load_weights(model, model_path):
     cdir = os.path.dirname(__file__)
@@ -24,16 +47,12 @@ def load_weights(model, model_path):
     if os.path.exists(checkpoint):
         print(f"Loading model weight from {checkpoint} ...")
         model.load_state_dict(torch.load(checkpoint))
+        remove_sadkernel_spectral_norm(model)
     else:
         print("-" * 32, "Warnning", "-" * 32)
         print(f"Model weight file '{checkpoint}' not exist !!!")
 
-# def make_coordinate_grid(spatial_size: Tuple[int, int, int], to_type:str):
-#     d, h, w = spatial_size
-#     x = torch.arange(w).type(to_type)
-#     y = torch.arange(h).type(to_type)
-#     z = torch.arange(d).type(to_type)
-# xxxx8888
+
 def make_coordinate_grid(spatial_size: Tuple[int, int, int]):
     d, h, w = spatial_size
     x = torch.arange(w)

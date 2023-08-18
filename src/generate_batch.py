@@ -61,8 +61,8 @@ def get_data(image_coeff_path, audio_path, device):
     orig_mel = audio.melspectrogram(wav).T # orig_mel.shape -- (641, 80), xxxx8888 !!!
     # array orig_mel shape: (641, 80) , min: -4.0 , max: 2.5998246882359766
 
-    # torch_mel = audio.torch_melspectrogram(torch.from_numpy(wav)).T
-    # debug_var("torch_mel", torch_mel)
+    torch_mel = audio.torch_melspectrogram(torch.from_numpy(wav)).T
+    debug_var("torch_mel", torch_mel)
 
     audio_mels = []
     for i in tqdm(range(audio_num_frames), 'mel:'):

@@ -31,7 +31,7 @@ class Audio2Exp(nn.Module):
         # Audio2Exp.batch is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
-        #     audio_num_frames value: 200
+        ##    num_frames value: 200
         #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
 
         mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]

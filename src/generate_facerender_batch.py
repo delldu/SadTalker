@@ -104,11 +104,11 @@ def transform_semantic(semantic, semantic_radius: int):
 def transform_semantic_target(coeff_3dmm, frame_index: int, semantic_radius: int):
     # array coeff_3dmm shape: (200, 70) , min: -1.6095467 , max: 1.0893884
 
-    audio_num_frames = coeff_3dmm.shape[0]
+    num_frames = coeff_3dmm.shape[0]
     seq = list(range(frame_index- semantic_radius, frame_index + semantic_radius+1))
     # seq -- [-13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 
     #     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-    index = [ min(max(item, 0), audio_num_frames-1) for item in seq ] 
+    index = [ min(max(item, 0), num_frames-1) for item in seq ] 
     # index -- [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     coeff_3dmm_g = coeff_3dmm[index, :] # shape -- (27, 70)
     return coeff_3dmm_g.transpose(1,0) # ==> shape -- (70, 27)

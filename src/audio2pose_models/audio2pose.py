@@ -33,7 +33,7 @@ class Audio2Pose(nn.Module):
         # Audio2Pose.x is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
-        #     audio_num_frames value: 200
+        ##    num_frames value: 200
         #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
         #     audio_name value: 'chinese_news'
         #     image_name value: 'dell'
@@ -47,11 +47,11 @@ class Audio2Pose(nn.Module):
         
         audio_mels= x['audio_mels'] # size() -- [1, 200, 1, 80, 16]
         indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 199, 1, 80, 16], we regard the reference as the first frame
-        audio_num_frames = x['audio_num_frames'] # 200
-        audio_num_frames = int(audio_num_frames) - 1 # ==> 199
+        num_frames = audio_mels.size(1) # x['num_frames'] # 200
+        num_frames = int(num_frames) - 1 # ==> 199
 
-        div = audio_num_frames//self.seq_len
-        re = audio_num_frames%self.seq_len
+        div = num_frames//self.seq_len
+        re = num_frames%self.seq_len
         pose_motion_pred_list = [torch.zeros(batch['image_pose'].unsqueeze(1).shape, 
                                 dtype=batch['image_pose'].dtype, 
                                 device=batch['image_pose'].device)]
