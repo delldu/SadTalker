@@ -54,7 +54,7 @@ class KPDetector(nn.Module):
             scale_factor=0.25,
             # estimate_jacobian=False, 
         ):
-        super(KPDetector, self).__init__()
+        super().__init__()
         self.predictor = KPHourglass(block_expansion, in_features=image_channel,
                                      max_features=max_features, reshape_features=reshape_channel,
                                      reshape_depth=reshape_depth, num_blocks=num_blocks)
@@ -84,7 +84,7 @@ class KPDetector(nn.Module):
         heatmap = heatmap.unsqueeze(-1)
 
         grid = make_coordinate_grid((shape[2],shape[3],
-            shape[4])).unsqueeze_(0).unsqueeze_(0).to(heatmap.device)
+            shape[4])).unsqueeze_(0).unsqueeze_(0).to(heatmap.device) # xxxx8888, !!! slower !!! ???
         value = (heatmap * grid).sum(dim=(2, 3, 4))
 
         return value
@@ -113,7 +113,7 @@ class AntiAliasInterpolation2d(nn.Module):
     Band-limited downsampling, for better preservation of the input signal.
     """
     def __init__(self, channels, scale):
-        super(AntiAliasInterpolation2d, self).__init__()
+        super().__init__()
         sigma = (1 / scale - 1) / 2
         kernel_size = 2 * round(sigma * 4) + 1
         self.ka = kernel_size // 2
@@ -163,8 +163,9 @@ class KPHourglass(nn.Module):
     KPHourglass architecture.
     """ 
 
-    def __init__(self, block_expansion, in_features, reshape_features, reshape_depth, num_blocks=3, max_features=256):
-        super(KPHourglass, self).__init__()
+    def __init__(self, block_expansion, in_features, reshape_features, reshape_depth, 
+        num_blocks=3, max_features=256):
+        super().__init__()
         
         self.down_blocks = nn.Sequential()
         for i in range(num_blocks):

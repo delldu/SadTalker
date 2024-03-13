@@ -102,7 +102,7 @@ class Audio2Pose(nn.Module):
 
 class ResidualConv(nn.Module):
     def __init__(self, input_dim, output_dim, stride, padding):
-        super(ResidualConv, self).__init__()
+        super().__init__()
 
         self.conv_block = nn.Sequential(
             nn.BatchNorm2d(input_dim),
@@ -120,13 +120,12 @@ class ResidualConv(nn.Module):
         )
 
     def forward(self, x):
-
         return self.conv_block(x) + self.conv_skip(x)
 
 
 class Upsample(nn.Module):
     def __init__(self, input_dim, output_dim, kernel, stride):
-        super(Upsample, self).__init__()
+        super().__init__()
 
         self.upsample = nn.ConvTranspose2d(
             input_dim, output_dim, kernel_size=kernel, stride=stride
@@ -137,7 +136,7 @@ class Upsample(nn.Module):
 
 class ResUnet(nn.Module):
     def __init__(self, channel=1, filters=[32, 64, 128, 256]):
-        super(ResUnet, self).__init__()
+        super().__init__()
 
         self.input_layer = nn.Sequential(
             nn.Conv2d(channel, filters[0], kernel_size=3, padding=1),
@@ -215,7 +214,7 @@ class Conv2d(nn.Module):
 
 class AudioEncoder(nn.Module):
     def __init__(self):
-        super(AudioEncoder, self).__init__()
+        super().__init__()
 
         self.audio_encoder = nn.Sequential(
             Conv2d(1, 32, kernel_size=3, stride=1, padding=1),

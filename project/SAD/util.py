@@ -52,17 +52,16 @@ def load_weights(model, model_path):
         print("-" * 32, "Warnning", "-" * 32)
         print(f"Model weight file '{checkpoint}' not exist !!!")
 
-
 def make_coordinate_grid(spatial_size: Tuple[int, int, int]):
     d, h, w = spatial_size
     x = torch.arange(w)
     y = torch.arange(h)
     z = torch.arange(d)
 
-    x = (2 * (x / (w - 1)) - 1)
-    y = (2 * (y / (h - 1)) - 1)
-    z = (2 * (z / (d - 1)) - 1)
-   
+    x = 2.0 * (x / (w - 1.0)) - 1.0
+    y = 2.0 * (y / (h - 1.0)) - 1.0
+    z = 2.0 * (z / (d - 1.0)) - 1.0
+
     yy = y.view(1, -1, 1).repeat(d, 1, w)
     xx = x.view(1, 1, -1).repeat(d, h, 1)
     zz = z.view(-1, 1, 1).repeat(1, h, w)
@@ -187,7 +186,7 @@ class DownBlock2d(nn.Module):
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(DownBlock2d, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)
         self.norm = nn.BatchNorm2d(out_features, affine=True)
@@ -206,7 +205,7 @@ class UpBlock3d(nn.Module):
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(UpBlock3d, self).__init__()
+        super().__init__()
 
         self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)

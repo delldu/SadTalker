@@ -102,6 +102,7 @@ class SADModel(nn.Module):
             ref_level_db=20,
             fmin=55.0,
             fmax=7600.0,  # To be increased/reduced depending on data.
+
         '''
         B = wav.shape[0]
         wav = torchaudio.functional.preemphasis(wav, coeff = 0.97) # 0.97 -- hp.preemphasis
@@ -126,14 +127,13 @@ class SADModel(nn.Module):
         # Amp to DB
         # min_level = math.exp(hp.min_level_db / 20.0 * math.log(10.0))
         # return 20.0 * torch.log10(torch.maximum(torch.Tensor([min_level]), x)) - hp.min_level_db
-        min_level = 9.9999e-06 # math.exp(-5.0 * math.log(10.0))
-        S = torch.clamp(S, min_level)
+        S = torch.clamp(S, 9.9999e-06)
         S = 20.0 * torch.log10(S) - 20.0
 
         # normalize
         # S = (2 * hp.max_abs_value) * ((S - hp.min_level_db) / (-hp.min_level_db)) - hp.max_abs_value    
         # S =torch.clip(S, -hp.max_abs_value, hp.max_abs_value)
-        S = 8.0 * ((S + 100.0) / 100.0) - 4.0    
+        S = 8.0 * ((S + 100.0) / 100.0) - 4.0
         orig_mel = torch.clip(S, -4.0, 4.0).transpose(1, 0) # size() -- [641, 80]
 
         mels_list = []

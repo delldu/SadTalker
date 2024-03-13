@@ -18,7 +18,7 @@ import pdb
 
 class Audio2Exp(nn.Module):
     def __init__(self):
-        super(Audio2Exp, self).__init__()
+        super().__init__()
         self.netG = Audio2ExpWrapperV2()
 
         # load_weights(self, "models/Audio2Exp.pth")
@@ -80,7 +80,7 @@ class Conv2d(nn.Module):
             return out
 
 class Audio2ExpWrapperV2(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
         self.audio_encoder = nn.Sequential(
             Conv2d(1, 32, kernel_size=3, stride=1, padding=1),

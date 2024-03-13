@@ -68,7 +68,7 @@ class SADKernel(nn.Module):
                  # dense_motion_params=None,
                  # estimate_jacobian=False, 
                 ):
-        super(SADKernel, self).__init__()
+        super().__init__()
         self.dense_motion_network = DenseMotionNetwork(num_kp=num_kp, feature_channel=feature_channel)
 
         self.first = SameBlock2d(image_channel, block_expansion, kernel_size=(3, 3), padding=(1, 1))
@@ -104,8 +104,8 @@ class SADKernel(nn.Module):
 
 
     def deform_input(self, inp, deformation):
-        _, d_old, h_old, w_old, _ = deformation.shape
         _, _, d, h, w = inp.shape
+        _, d_old, h_old, w_old, _ = deformation.shape
         if d_old != d or h_old != h or w_old != w:
             deformation = deformation.permute(0, 4, 1, 2, 3)
             deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
@@ -203,7 +203,7 @@ class SameBlock2d(nn.Module):
     """
 
     def __init__(self, in_features, out_features, groups=1, kernel_size=3, padding=1, lrelu=False):
-        super(SameBlock2d, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features,
                               kernel_size=kernel_size, padding=padding, groups=groups)
         self.norm = nn.BatchNorm2d(out_features, affine=True)
@@ -255,7 +255,7 @@ class SPADEResnetBlock(nn.Module):
         self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=dilation, dilation=dilation)
         self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=dilation, dilation=dilation)
 
-        # apply spectral norm if specified, xxxx8888
+        # apply spectral norm if specified
         self.conv_0 = spectral_norm(self.conv_0)
         self.conv_1 = spectral_norm(self.conv_1)
 
@@ -294,7 +294,6 @@ class ShortcutSPADEResnetBlock(nn.Module):
         self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
 
         # apply spectral norm if specified
-        # xxxx8888
         self.conv_0 = spectral_norm(self.conv_0)
         self.conv_1 = spectral_norm(self.conv_1)
         self.conv_s = spectral_norm(self.conv_s)
@@ -325,7 +324,7 @@ class ResBlock3d(nn.Module):
     """
 
     def __init__(self, in_features, kernel_size, padding):
-        super(ResBlock3d, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv3d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size,
                                padding=padding)
         self.conv2 = nn.Conv3d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size,
@@ -345,7 +344,7 @@ class ResBlock3d(nn.Module):
 
 if __name__ == "__main__":
     model = SADKernel()
-
     remove_sadkernel_spectral_norm(model)
+
     model = torch.jit.script(model)    
     print(model)

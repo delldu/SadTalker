@@ -87,10 +87,19 @@ def get_model():
     model, device = create_model()
     # print(model)
 
-    model = torch.jit.script(model) # xxxx8888
-    todos.data.mkdir("output")
-    if not os.path.exists("output/SAD.torch"):
-        model.save("output/SAD.torch")
+    # https://github.com/pytorch/pytorch/issues/52286
+    torch._C._jit_set_profiling_executor(False)
+    # C++ Reference
+    # torch::jit::getProfilingMode() = false;                                                                                                             
+    # torch::jit::setTensorExprFuserEnabled(false);
+
+    model = torch.jit.script(model)
+    # model = torch.jit.freeze(model)
+    # model = torch.jit.optimize_for_inference(model)
+    
+    # todos.data.mkdir("output")
+    # if not os.path.exists("output/SAD.torch"):
+    #     model.save("output/SAD.torch")
 
     return model, device
 

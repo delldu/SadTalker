@@ -34,7 +34,7 @@ class MappingNet(nn.Module):
         num_kp=15, 
         num_bins=66,
     ):
-        super(MappingNet, self).__init__()
+        super().__init__()
 
         self.layer = layer
         self.first = nn.Sequential(
@@ -80,7 +80,11 @@ class MappingNet(nn.Module):
 
 if __name__ == "__main__":
     model = MappingNet()
-    model = torch.jit.script(model)    
+
+    # from torch.fx import symbolic_trace
+    # model = symbolic_trace(model)    
+    model = torch.jit.script(model)
+
     print(model)
     # ==> OK
 

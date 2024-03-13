@@ -17,7 +17,8 @@ import pdb
 
 class DenseMotionNetwork(nn.Module):
     """
-    Module that predicting a dense motion from sparse motion representation given by image_kp and audio_kp
+    Module that predicting a dense motion from sparse motion representation 
+    given by image_kp and audio_kp
     src/config/facerender.yaml
         dense_motion_params:
           block_expansion: 32
@@ -36,7 +37,7 @@ class DenseMotionNetwork(nn.Module):
                 reshape_depth=16, 
                 compress=4,
             ):
-        super(DenseMotionNetwork, self).__init__()
+        super().__init__()
         self.hourglass = Hourglass(
                 block_expansion=block_expansion, 
                 in_features=(num_kp+1)*(compress+1), 
@@ -130,19 +131,16 @@ class DenseMotionNetwork(nn.Module):
 
         return out_dict
 
-class Encoder(nn.Module):
-    """
-    Hourglass Encoder
-    """
-
+class HourglassEncoder(nn.Module):
     def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
-        super(Encoder, self).__init__()
+        super().__init__()
 
         down_blocks = []
         for i in range(num_blocks):
-            down_blocks.append(DownBlock3d(in_features if i == 0 else min(max_features, block_expansion * (2 ** i)),
-                                           min(max_features, block_expansion * (2 ** (i + 1))),
-                                           kernel_size=3, padding=1))
+            down_blocks.append(DownBlock3d(
+                in_features if i == 0 else min(max_features, block_expansion * (2 ** i)),
+                min(max_features, block_expansion * (2 ** (i + 1))),
+                kernel_size=3, padding=1))
         self.down_blocks = nn.ModuleList(down_blocks)
 
     def forward(self, x):
@@ -152,13 +150,9 @@ class Encoder(nn.Module):
         return outs
 
 
-class Decoder(nn.Module):
-    """
-    Hourglass Decoder
-    """
-
+class HourglassDecoder(nn.Module):
     def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
-        super(Decoder, self).__init__()
+        super().__init__()
 
         up_blocks = []
 
@@ -199,9 +193,9 @@ class Hourglass(nn.Module):
     """
 
     def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
-        super(Hourglass, self).__init__()
-        self.encoder = Encoder(block_expansion, in_features, num_blocks, max_features)
-        self.decoder = Decoder(block_expansion, in_features, num_blocks, max_features)
+        super().__init__()
+        self.encoder = HourglassEncoder(block_expansion, in_features, num_blocks, max_features)
+        self.decoder = HourglassDecoder(block_expansion, in_features, num_blocks, max_features)
         self.out_filters = self.decoder.out_filters
 
     def forward(self, x):
@@ -231,7 +225,7 @@ class DownBlock3d(nn.Module):
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(DownBlock3d, self).__init__()
+        super().__init__()
         self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)
         self.norm = nn.BatchNorm3d(out_features, affine=True)

@@ -22,7 +22,7 @@ import pdb
 class Image2Coeff(nn.Module):
     fc_dim=257
     def __init__(self):
-        super(Image2Coeff, self).__init__()
+        super().__init__()
 
         net_recon='resnet50'
         if net_recon not in func_dict:
@@ -44,7 +44,6 @@ class Image2Coeff(nn.Module):
             nn.init.constant_(m.weight, 0.)
             nn.init.constant_(m.bias, 0.)
 
-        # torch.jit.script(self) ==> Error, ResNet._forward_impl, 295
         # load_weights(self, "models/Image2Coeff.pth")
 
     def forward(self, x):
@@ -146,8 +145,7 @@ class Bottleneck(nn.Module):
 
     expansion: int = 4
 
-    def __init__(
-        self,
+    def __init__(self,
         inplanes: int,
         planes: int,
         stride: int = 1,
@@ -156,7 +154,7 @@ class Bottleneck(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None
-    ) -> None:
+    ):
         super(Bottleneck, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -196,9 +194,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-
-    def __init__(
-        self,
+    def __init__(self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
         num_classes: int = 1000,
@@ -207,7 +203,7 @@ class ResNet(nn.Module):
         width_per_group: int = 64,
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
-    ) -> None:
+    ):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d

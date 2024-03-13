@@ -23,7 +23,7 @@ import pdb
 
 class Audio2Coeff(nn.Module):
     def __init__(self):
-        super(Audio2Coeff, self).__init__()
+        super().__init__()
         self.audio2exp_model = Audio2Exp()
         self.audio2pose_model = Audio2Pose()
 
