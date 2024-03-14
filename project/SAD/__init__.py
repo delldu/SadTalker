@@ -16,7 +16,6 @@ import os
 import subprocess
 from tqdm import tqdm
 from PIL import Image
-import numpy as np
 
 import torch
 import todos
@@ -104,7 +103,7 @@ def get_model():
 def load_wav(audio_path, new_sample_rate=16000):
     waveform, sample_rate = torchaudio.load(audio_path)
     waveform = torchaudio.functional.resample(waveform, orig_freq=sample_rate, new_freq=new_sample_rate)
-    waveform = waveform[0] # half is enough for application
+    waveform = waveform[0] # half enough for application
 
     # Parse audio length
     fps = 25

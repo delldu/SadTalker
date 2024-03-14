@@ -15,10 +15,8 @@ from SAD.util import (
     DownBlock2d,
     UpBlock3d, 
     make_coordinate_grid, 
-    load_weights,
 )
 
-from typing import Dict
 import todos
 import pdb
 
@@ -42,7 +40,7 @@ class KeypointDetector(nn.Module):
     """
     def __init__(self, 
             block_expansion=32, 
-            feature_channel=32, 
+            # feature_channel=32, 
             num_kp=15, 
             image_channel=3, 
             max_features=1024, 
@@ -61,19 +59,10 @@ class KeypointDetector(nn.Module):
             kernel_size=3, padding=1)
 
         self.temperature = temperature
-        self.scale_factor = scale_factor
-        if self.scale_factor != 1:
-            self.down = AntiAliasInterpolation2d(image_channel, self.scale_factor)
-        else: # To support torch.jit.script
-            pdb.set_trace()
-            self.down = nn.Identity()
+        self.down = AntiAliasInterpolation2d(image_channel, scale_factor)
 
-        # load_weights(self, "models/KeypointDetector.pth")
 
     def gaussian2keypoint(self, heatmap):
-        """
-        Extract the mean from a heatmap
-        """
         shape = heatmap.shape
         heatmap = heatmap.unsqueeze(-1)
 
@@ -115,8 +104,7 @@ class AntiAliasInterpolation2d(nn.Module):
 
         kernel_size = [kernel_size, kernel_size]
         sigma = [sigma, sigma]
-        # The gaussian kernel is the product of the
-        # gaussian function of each dimension.
+        # The gaussian kernel is the product of the gaussian function of each dimension.
         kernel = 1
         meshgrids = torch.meshgrid(
             [
@@ -137,14 +125,9 @@ class AntiAliasInterpolation2d(nn.Module):
 
         self.register_buffer('weight', kernel)
         self.groups = channels
-        self.scale = scale
-        inv_scale = 1 / scale
-        self.int_inv_scale = int(inv_scale)
+        self.int_inv_scale = int(1.0 / scale)
 
     def forward(self, input):
-        if self.scale == 1.0:
-            return input
-
         out = F.pad(input, (self.ka, self.kb, self.ka, self.kb))
         out = F.conv2d(out, weight=self.weight, groups=self.groups)
         out = out[:, :, ::self.int_inv_scale, ::self.int_inv_scale]
@@ -188,9 +171,3 @@ class KeypointHourglass(nn.Module):
         out = self.up_blocks(out)
 
         return out
-        
-if __name__ == "__main__":
-    model = KeypointDetector()
-    model = torch.jit.script(model)    
-    print(model)
-    # ==> OK

@@ -8,13 +8,11 @@
 # ***
 # ************************************************************************************/
 #
-import os 
 import torch
 import torch.nn as nn
 
 from SAD.audio2pose import Audio2Pose
 from SAD.audio2exp import Audio2Exp
-from typing import Dict
 
 import todos
 import pdb
@@ -26,25 +24,24 @@ class Audio2Coeff(nn.Module):
         self.audio2exp_model = Audio2Exp()
         self.audio2pose_model = Audio2Pose()
 
-    def forward(self, batch: Dict[str, torch.Tensor], pose_style:int=0):
-        # batch is dict:
-        #     tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
-        #     tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
-        #     tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
+    def forward(self, audio_mels, image_exp_pose, audio_ratio, pose_style:int=0):
+        # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+        # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
+        # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
         # [pose_style] value: '0'
 
         with torch.no_grad():
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            exp_pred= self.audio2exp_model(batch) # Audio2Exp(...)
+            exp_pred= self.audio2exp_model(audio_mels, image_exp_pose, audio_ratio) # Audio2Exp(...)
             # tensor [exp_pred] size: [1, 200, 64], min: -1.673844, max: 1.242088, mean: -0.011497
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             #46 styles can be selected 
-            batch['class'] = torch.LongTensor([pose_style]).to(exp_pred.device)
+            batch_id = torch.LongTensor([pose_style]).to(exp_pred.device)
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred = self.audio2pose_model(batch) # Audio2Pose(...)
+            pose_pred = self.audio2pose_model(audio_mels, image_exp_pose, audio_ratio, batch_id) # Audio2Pose(...)
             # tensor [pose_pred] size: [1, 200, 6], min: -0.809749, max: 0.27462, mean: -0.102681
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -53,10 +50,3 @@ class Audio2Coeff(nn.Module):
             # tensor [coeffs_pred] size: [1, 200, 70], min: -1.690973, max: 1.272287, mean: -0.021126
 
             return coeffs_pred # coeffs_pred.size() -- [1, 200, 70]
-
-
-if __name__ == "__main__":
-    model = Audio2Coeff()
-    model = torch.jit.script(model)    
-    print(model)
-    # ==> OK

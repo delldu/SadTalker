@@ -13,9 +13,10 @@ from torch import nn
 import torch.nn.functional as F
 from torch.nn.utils import spectral_norm, remove_spectral_norm
 from SAD.dense_motion import DenseMotionNetwork
-from SAD.util import load_weights, DownBlock2d
+from SAD.util import DownBlock2d
+from typing import Tuple
 
-from typing import Dict
+import todos
 import pdb
 
 def remove_sadkernel_spectral_norm(model):
@@ -38,7 +39,6 @@ def remove_sadkernel_spectral_norm(model):
     remove_spectral_norm(model.decoder.up_1.conv_0)
     remove_spectral_norm(model.decoder.up_1.conv_1)
     remove_spectral_norm(model.decoder.up_1.conv_s)    
-
 
 # comes from "first order motion" ?
 class SADKernel(nn.Module):
@@ -64,9 +64,6 @@ class SADKernel(nn.Module):
                  reshape_channel=32, 
                  reshape_depth=16, 
                  num_resblocks=6,
-                 # estimate_occlusion_map=True,
-                 # dense_motion_params=None,
-                 # estimate_jacobian=False, 
                 ):
         super().__init__()
         self.dense_motion_network = DenseMotionNetwork(num_kp=num_kp, feature_channel=feature_channel)
@@ -95,55 +92,37 @@ class SADKernel(nn.Module):
 
         self.decoder = SPADEDecoder()
 
-        # load_weights(self, "models/SADKernel.pth")
-
 
     def deform_input(self, inp, deformation):
+        # tensor [inp] size: [1, 32, 16, 128, 128], min: -102.424561, max: 113.730629, mean: 0.687735
         _, _, d, h, w = inp.shape
-        _, d_old, h_old, w_old, _ = deformation.shape
-        if d_old != d or h_old != h or w_old != w:
-            pdb.set_trace()
-            deformation = deformation.permute(0, 4, 1, 2, 3)
-            deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
-            deformation = deformation.permute(0, 2, 3, 4, 1)
-
-        # _, _, d, h, w = inp.shape
-        # deformation = deformation.permute(0, 4, 1, 2, 3)
-        # deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
-        # deformation = deformation.permute(0, 2, 3, 4, 1)
+        deformation = deformation.permute(0, 4, 1, 2, 3)
+        deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
+        deformation = deformation.permute(0, 2, 3, 4, 1)
  
-        return F.grid_sample(inp, deformation, align_corners=False)
+        # onnx: 5D grid sample
+        # tensor [deformation] size: [1, 16, 128, 128, 3], min: -1.025367, max: 1.00552, mean: -0.011624
+        return F.grid_sample(inp, deformation, align_corners=False) # size() -- [1, 32, 16, 128, 128
 
     def forward(self, source_image, audio_kp, image_kp):
         # Encoding (downsampling) part
         out = self.first(source_image)
-
-        # for i in range(len(self.down_blocks)):
-        #     out = self.down_blocks[i](out)
         for i, m in enumerate(self.down_blocks):
             out = m(out)
 
         out = self.second(out)
         bs, c, h, w = out.shape
-        # print(out.shape)
         feature_3d = out.view(bs, self.reshape_channel, self.reshape_depth, h ,w) 
         feature_3d = self.resblocks_3d(feature_3d)
 
         # Transforming feature representation according to deformation and occlusion
-        output_dict = {}
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # feature_3d.size() -- [2, 32, 16, 64, 64]
-        # dense_motion -- DenseMotionNetwork(...)
-        dense_motion = self.dense_motion_network(feature=feature_3d, audio_kp=audio_kp,
-                                                 image_kp=image_kp)
+        deformation, occlusion_map = self.dense_motion_network(
+                feature=feature_3d, audio_kp=audio_kp, image_kp=image_kp)
 
-        # dense_motion.keys() -- ['mask', 'deformation', 'occlusion_map']
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-        output_dict['mask'] = dense_motion['mask']
-        occlusion_map = dense_motion['occlusion_map']
-        output_dict['occlusion_map'] = occlusion_map
-        deformation = dense_motion['deformation'] # size() -- [2, 16, 64, 64, 3]
+        # deformation size() -- [2, 16, 64, 64, 3]
 
         out = self.deform_input(feature_3d, deformation)
 
@@ -151,14 +130,11 @@ class SADKernel(nn.Module):
         out = out.view(bs, c*d, h, w)
         out = self.third(out)
         out = self.fourth(out)
-
-        if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
-            occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
         out = out * occlusion_map
 
         # Decoding part
         out = self.decoder(out)
-        return out # size() -- [2, 3, 256, 256]
+        return out # size() -- [1, 3, 512, 512]
 
 class SPADEDecoder(nn.Module):
     def __init__(self):
@@ -166,21 +142,21 @@ class SPADEDecoder(nn.Module):
         ic = 256
         oc = 64
         label_nc = 256
-        norm_G = 'spadespectralinstance'
         
         self.fc = nn.Conv2d(ic, 2 * ic, 3, padding=1)
-        self.G_middle_0 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_1 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_2 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_3 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_4 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.G_middle_5 = SPADEResnetBlock(2 * ic, 2 * ic, norm_G, label_nc)
-        self.up_0 = ShortcutSPADEResnetBlock(2 * ic, ic, norm_G, label_nc)
-        self.up_1 = ShortcutSPADEResnetBlock(ic, oc, norm_G, label_nc)
+        self.G_middle_0 = SPADEResnetBlock(2 * ic, 2 * ic, label_nc)
+        self.G_middle_1 = SPADEResnetBlock(2 * ic, 2 * ic, label_nc)
+        self.G_middle_2 = SPADEResnetBlock(2 * ic, 2 * ic, label_nc)
+        self.G_middle_3 = SPADEResnetBlock(2 * ic, 2 * ic, label_nc)
+        self.G_middle_4 = SPADEResnetBlock(2 * ic, 2 * ic, label_nc)
+        self.G_middle_5 = SPADEResnetBlock(2 * ic, 2 * ic, label_nc)
+        self.up_0 = ShortcutSPADEResnetBlock(2 * ic, ic, label_nc)
+        self.up_1 = ShortcutSPADEResnetBlock(ic, oc, label_nc)
         self.conv_img = nn.Conv2d(oc, 3, 3, padding=1)
         self.up = nn.Upsample(scale_factor=2)
         
     def forward(self, feature):
+        # tensor [feature] size: [1, 256, 128, 128], min: -7.785244, max: 7.086696, mean: -0.024823
         seg = feature
         x = self.fc(feature)
         x = self.G_middle_0(x, seg)
@@ -196,7 +172,8 @@ class SPADEDecoder(nn.Module):
 
         x = self.conv_img(F.leaky_relu(x, 2e-1))
         x = F.sigmoid(x)
-        
+
+        # tensor [x] size: [1, 3, 512, 512], min: 0.000365, max: 0.982053, mean: 0.578382
         return x
 
 class SameBlock2d(nn.Module):
@@ -220,12 +197,20 @@ class SameBlock2d(nn.Module):
         out = self.ac(out)
         return out
 
+# https://zhuanlan.zhihu.com/p/675551997
+class InstanceNorm2dAlt(nn.InstanceNorm2d):
+    def forward(self, inp: torch.Tensor) -> torch.Tensor:
+        self._check_input_dim(inp)
+        desc = 1 / (inp.var(axis=[2, 3], keepdim=True, unbiased=False) + self.eps) ** 0.5
+        retval = (inp - inp.mean(axis=[2, 3], keepdim=True)) * desc
+        return retval
+
 
 class SPADE(nn.Module):
     def __init__(self, norm_nc, label_nc):
         super().__init__()
         nhidden = 128
-        self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
+        self.param_free_norm = InstanceNorm2dAlt(norm_nc) # nn.InstanceNorm2d(norm_nc, affine=False)
         self.mlp_shared = nn.Sequential(
             nn.Conv2d(label_nc, nhidden, kernel_size=3, padding=1),
             nn.ReLU())
@@ -246,22 +231,21 @@ class SPADEResnetBlock(nn.Module):
     '''
         self.learned_shortcut = (fin != fout),  False
     '''    
-    def __init__(self, fin, fout, norm_G, label_nc, dilation=1):
+    def __init__(self, fin, fout, label_nc, dilation=1):
         super().__init__()
-        # norm_G === 'spadespectralinstance'
-
         # Attributes
         self.learned_shortcut = (fin != fout)
         fmiddle = min(fin, fout)
-        # create conv layers
+
+        # Create conv layers
         self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=dilation, dilation=dilation)
         self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=dilation, dilation=dilation)
 
-        # apply spectral norm if specified
+        # Apply spectral norm if specified
         self.conv_0 = spectral_norm(self.conv_0)
         self.conv_1 = spectral_norm(self.conv_1)
 
-        # define normalization layers
+        # Define normalization layers
         self.norm_0 = SPADE(fin, label_nc)
         self.norm_1 = SPADE(fmiddle, label_nc)
 
@@ -284,10 +268,8 @@ class ShortcutSPADEResnetBlock(nn.Module):
     '''
         self.learned_shortcut = (fin != fout),  True
     '''
-    def __init__(self, fin, fout, norm_G, label_nc, dilation=1):
+    def __init__(self, fin, fout, label_nc, dilation=1):
         super().__init__()
-        # norm_G === 'spadespectralinstance'
-
         # Attributes
         fmiddle = min(fin, fout)
         # create conv layers
@@ -321,16 +303,14 @@ class ShortcutSPADEResnetBlock(nn.Module):
 
 
 class ResBlock3d(nn.Module):
-    """
-    Res block, preserve spatial resolution.
-    """
+    """Res block, preserve spatial resolution. """
 
     def __init__(self, in_features, kernel_size, padding):
         super().__init__()
-        self.conv1 = nn.Conv3d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size,
-                               padding=padding)
-        self.conv2 = nn.Conv3d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size,
-                               padding=padding)
+        self.conv1 = nn.Conv3d(in_channels=in_features, out_channels=in_features, 
+                        kernel_size=kernel_size, padding=padding)
+        self.conv2 = nn.Conv3d(in_channels=in_features, out_channels=in_features, 
+                        kernel_size=kernel_size, padding=padding)
         self.norm1 = nn.BatchNorm3d(in_features, affine=True)
         self.norm2 = nn.BatchNorm3d(in_features, affine=True)
 
@@ -343,10 +323,3 @@ class ResBlock3d(nn.Module):
         out = self.conv2(out)
         out += x
         return out
-
-if __name__ == "__main__":
-    model = SADKernel()
-    remove_sadkernel_spectral_norm(model)
-
-    model = torch.jit.script(model)    
-    print(model)

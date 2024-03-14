@@ -10,9 +10,8 @@
 #
 import torch
 from torch import nn
-from SAD.util import load_weights
 
-from typing import Dict, List
+from typing import List
 import todos
 import pdb
 
@@ -21,28 +20,24 @@ class Audio2Exp(nn.Module):
         super().__init__()
         self.netG = Audio2ExpWrapperV2()
 
+    def forward(self, audio_mels, image_exp_pose, audio_ratio):
+        # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+        # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
+        # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.58
 
-    def forward(self, batch: Dict[str, torch.Tensor]):
-        # batch is dict:
-        #     tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
-        #     tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
-        #     tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.58
-
-        mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]
-        T = mel_input.shape[1] # ==> 200
-
+        T = audio_mels.shape[1] # ==> 200
         exp_predict_list: List[torch.Tensor] = []
 
         for i in range(0, T, 10): # every 10 frames
-            current_mel_input = mel_input[:,i:i+10]
+            current_mel_input = audio_mels[:,i:i+10]
             audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
 
-            image_exp = batch['image_exp_pose'][:, :, :64][:, i:i+10] # size() -- [1, 10, 64]
-            audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
+            image_exp = image_exp_pose[:, i:i+10, :64] # size() -- [1, 10, 64]
+            audio_ratio2 = audio_ratio[:, i:i+10]  # size() -- [1, 10, 1]
             
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # self.netG -- Audio2ExpWrapperV2(...)
-            y  = self.netG(audio_mel, image_exp, audio_ratio) # [1, 200, 64]
+            y  = self.netG(audio_mel, image_exp, audio_ratio2) # [1, 200, 64]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 
             exp_predict_list += [y] # size() -- [1, 10, 64]
@@ -72,9 +67,7 @@ class Audio2Exp(nn.Module):
 
 
 class Conv2d(nn.Module):
-    # def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True):
+    def __init__(self, cin, cout, kernel_size, stride, padding, residual=False):
         super().__init__()
         self.conv_block = nn.Sequential(
                             nn.Conv2d(cin, cout, kernel_size, stride, padding),
@@ -82,18 +75,12 @@ class Conv2d(nn.Module):
                         )
         self.act = nn.ReLU()
         self.residual = residual
-        self.use_act = use_act
 
     def forward(self, x):
         out = self.conv_block(x)
         if self.residual: # True or False
             out += x
-        
-        if self.use_act: # ==== True
-            return self.act(out)
-        else:
-            pdb.set_trace()
-            return out
+        return self.act(out)
 
 class Audio2ExpWrapperV2(nn.Module):
     def __init__(self):
@@ -117,9 +104,7 @@ class Audio2ExpWrapperV2(nn.Module):
             Conv2d(256, 512, kernel_size=3, stride=1, padding=0),
             Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
         )
-
         self.mapping1 = nn.Linear(512+64+1, 64)
-        # nn.init.constant_(self.mapping1.bias, 0.)
 
     def forward(self, audio_mel, image_exp, audio_ratio):
         # tensor [audio_mel] size: [10, 1, 80, 16], min: -3.269791, max: 0.703544, mean: -1.632042
@@ -135,10 +120,3 @@ class Audio2ExpWrapperV2(nn.Module):
         # tensor [out] size: [1, 10, 64], min: -1.311815, max: 1.241706, mean: -0.000448
 
         return out
-
-
-if __name__ == "__main__":
-    model = Audio2Exp()
-    model = torch.jit.script(model)
-    print(model)
-    # ==> OK

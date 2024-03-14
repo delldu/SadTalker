@@ -10,4 +10,4 @@
 #
 import SAD
 
-SAD.predict("audios/chinese_news.wav", "images/0021.png", "output")
+SAD.predict("audios/chinese_news.wav", "images/0001.png", "output")

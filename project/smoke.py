@@ -2,42 +2,226 @@
 #
 # /************************************************************************************
 # ***
-# ***    Copyright Dell 2023(18588220928@163.com) All Rights Reserved.
+# ***    Copyright Dell 2020-2024(18588220928@163.com), All Rights Reserved.
 # ***
-# ***    File Author: Dell, Wed 16 Aug 2023 04:17:55 PM CST
+# ***    File Author: Dell, 2020年 12月 28日 星期一 14:29:37 CST
 # ***
 # ************************************************************************************/
 #
 
-import pdb
 import os
-import time
 import torch
 import SAD
+import argparse
+import todos
+import pdb
 
-from tqdm import tqdm
+def test_input_shape():
+    import time
+    import random
+    from tqdm import tqdm
 
-if __name__ == "__main__":
+    print("Test input shape ...")
+
     model, device = SAD.get_model()
 
     N = 100
-    B, C, H, W = 1, 3, 512, 512
+    B, C, H, W = 1, 3, 256, 256
 
     mean_time = 0
     progress_bar = tqdm(total=N)
     for count in range(N):
         progress_bar.update(1)
 
-        audio_tensor = torch.randn(B, 70, 27)
-        image_tensor = torch.randn(B, C, H, W)
-        # print("image_tensor: ", image_tensor.size())
+        kp1 = torch.randn(B, 50, 2)
+        kp2 = torch.randn(B, 50, 2)
+
+        x = torch.randn(B, C, H, W)
 
         start_time = time.time()
         with torch.no_grad():
-            y = model(audio_tensor.to(device), image_tensor.to(device))
+            y = model(kp1.to(device), kp2.to(device), x.to(device))
         torch.cuda.synchronize()
         mean_time += time.time() - start_time
 
     mean_time /= N
     print(f"Mean spend {mean_time:0.4f} seconds")
     os.system("nvidia-smi | grep python")
+
+
+def run_bench_mark():
+    print("Run benchmark ...")
+
+    model, device = SAD.get_model()
+    N = 100
+    B, C, H, W = 1, 3, 256, 256
+
+    with torch.profiler.profile(
+        activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA]
+    ) as p:
+        for ii in range(N):
+            image1 = torch.randn(B, C, H, W)
+            image2 = torch.randn(B, C, H, W)
+            with torch.no_grad():
+                y = model(image1.to(device), image2.to(device))
+            torch.cuda.synchronize()
+        p.step()
+
+    print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
+    os.system("nvidia-smi | grep python")
+
+
+def export_drive_face_keypoint_onnx_model():
+    import onnx
+    import onnxruntime
+    from onnxsim import simplify
+    import onnxoptimizer
+
+    print("Export drive_face_keypoint onnx model ...")
+
+    # 1. Run torch model
+    model, device = SAD.get_model()
+
+    B, C, H, W = 1, 3, 512, 512
+    dummy_input = torch.randn(B, C, H, W).to(device)
+
+    with torch.no_grad():
+        dummy_output = model(dummy_input)
+    torch_outputs = [dummy_output.cpu()]
+
+    # 2. Export onnx model
+    input_names = [ "input" ]
+    output_names = [ "output" ]
+    onnx_filename = "output/drive_face_keypoint.onnx"
+
+    torch.onnx.export(model, 
+        (dummy_input),
+        onnx_filename, 
+        verbose=False, 
+        input_names=input_names, 
+        output_names=output_names,
+        opset_version=20,
+    )
+
+    # 3. Check onnx model file
+    onnx_model = onnx.load(onnx_filename)
+    onnx.checker.check_model(onnx_model)
+
+    # onnx_model, check = simplify(onnx_model)
+    # assert check, "Simplified ONNX model could not be validated"
+    # onnx_model = onnxoptimizer.optimize(onnx_model)
+    # onnx.save(onnx_model, onnx_filename)
+    # print(onnx.helper.printable_graph(onnx_model.graph))
+
+    # 4. Run onnx model
+    if 'cuda' in device.type:
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CUDAExecutionProvider'])
+    else:        
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CPUExecutionProvider'])
+
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+    onnx_inputs = { input_names[0]: to_numpy(dummy_input), 
+                }
+    onnx_outputs = ort_session.run(None, onnx_inputs)
+
+    # 5.Compare output results
+    assert len(torch_outputs) == len(onnx_outputs)
+    for torch_output, onnx_output in zip(torch_outputs, onnx_outputs):
+        torch.testing.assert_close(torch_output, torch.tensor(onnx_output), rtol=0.01, atol=0.01)
+
+    todos.model.reset_device()
+
+    print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
+
+
+def export_audo_face_generator_onnx_model():
+    import onnx
+    import onnxruntime
+    from onnxsim import simplify
+    import onnxoptimizer
+
+    print("Export drive_face_generator onnx model ...")
+
+    # 1. Run torch model
+    model, device = SAD.get_model()
+    model = model.sadkernel_model
+
+    B, C, H, W = 1, 3, 512, 512
+    image = torch.randn(B, C, H, W).to(device) # source_kp
+    audio_kp = torch.randn(B, 15, 3).to(device) # offset_kp
+    image_kp = torch.randn(B, 15, 3).to(device) # source_image
+
+    # image, audio_kp=audio_kp, image_kp=image_kp
+    with torch.no_grad():
+        dummy_output = model(image, audio_kp, image_kp)
+
+    torch_outputs = [dummy_output.cpu()]
+
+    # 2. Export onnx model
+    input_names = [ "image", "audio_ko", "image_kp" ]
+    output_names = [ "output" ]
+    onnx_filename = "output/audio_face_generator.onnx"
+
+    torch.onnx.export(model, 
+        (image, audio_kp, image_kp),
+        onnx_filename, 
+        verbose=False, 
+        input_names=input_names, 
+        output_names=output_names,
+        opset_version=16,
+    )
+
+    # 3. Check onnx model file
+    onnx_model = onnx.load(onnx_filename)
+    onnx.checker.check_model(onnx_model)
+
+    onnx_model, check = simplify(onnx_model)
+    assert check, "Simplified ONNX model could not be validated"
+    onnx_model = onnxoptimizer.optimize(onnx_model)
+    onnx.save(onnx_model, onnx_filename)
+    # print(onnx.helper.printable_graph(onnx_model.graph))
+
+    # 4. Run onnx model
+    if 'cuda' in device.type:
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CUDAExecutionProvider'])
+    else:        
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CPUExecutionProvider'])
+
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+    onnx_inputs = { input_names[0]: to_numpy(image), 
+                    input_names[1]: to_numpy(audio_kp),
+                    input_names[2]: to_numpy(image_kp),
+                }
+    onnx_outputs = ort_session.run(None, onnx_inputs)
+
+    # 5.Compare output results
+    assert len(torch_outputs) == len(onnx_outputs)
+    for torch_output, onnx_output in zip(torch_outputs, onnx_outputs):
+        torch.testing.assert_close(torch_output, torch.tensor(onnx_output), rtol=0.05, atol=0.05)
+
+    todos.model.reset_device()
+
+    print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Smoke Test')
+    parser.add_argument('-s', '--shape_test', action="store_true", help="test shape")
+    parser.add_argument('-b', '--bench_mark', action="store_true", help="test benchmark")
+    parser.add_argument('-e', '--export_onnx', action="store_true", help="txport onnx model")
+    args = parser.parse_args()
+
+    if args.shape_test:
+        test_input_shape()
+    if args.bench_mark:
+        run_bench_mark()
+    if args.export_onnx:
+        # export_drive_face_keypoint_onnx_model()
+        export_audo_face_generator_onnx_model()
+    
+    if not (args.shape_test or args.bench_mark or args.export_onnx):
+        parser.print_help()

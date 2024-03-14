@@ -8,7 +8,6 @@
 # ***
 # ************************************************************************************/
 #
-# from SAD.util import load_weights ...
 
 import os
 import torch
@@ -72,9 +71,8 @@ def make_coordinate_grid(spatial_size: Tuple[int, int, int]):
 
 
 def headpose_pred_to_degree(pred):
-    device = pred.device
     idx_tensor = [idx for idx in range(66)]
-    idx_tensor = torch.FloatTensor(idx_tensor).type_as(pred).to(device)
+    idx_tensor = torch.FloatTensor(idx_tensor).type_as(pred).to(pred.device)
     pred = F.softmax(pred, dim=1)
     degree = torch.sum(pred*idx_tensor, 1) * 3 - 99
     return degree
@@ -139,42 +137,26 @@ def get_rotation_matrix(yaw, pitch, roll):
 
     return rot_mat
 
-def keypoint_transform(kp, he: Dict[str, torch.Tensor]):
+def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
     # kp -- [2, 15, 3]
-    # he.keys() -- ['yaw', 'pitch', 'roll', 't', 'exp']
-
-    yaw, pitch, roll= he['yaw'], he['pitch'], he['roll']
-    # he['yaw'].size() --[2, 66]
+    # yaw.size() --[2, 66]
 
     yaw = headpose_pred_to_degree(yaw) 
     pitch = headpose_pred_to_degree(pitch)
     roll = headpose_pred_to_degree(roll)
-
-    if 'yaw_in' in he: # False
-        yaw = he['yaw_in']
-        pdb.set_trace()
-    if 'pitch_in' in he: # False
-        pitch = he['pitch_in']
-        pdb.set_trace()
-
-    if 'roll_in' in he: # False
-        roll = he['roll_in']
-        pdb.set_trace()
-
     rot_mat = get_rotation_matrix(yaw, pitch, roll)    # (bs, 3, 3)
 
-    t, exp = he['t'], he['exp']
     # keypoint rotation
     kp_rotated = torch.einsum('bmp,bkp->bkm', rot_mat, kp)
 
     # keypoint translation
-    # (Pdb) he['t']
+    # (Pdb) trans
     # tensor([[ 0.0084, -0.0088,  0.2165],
     #         [ 0.0084, -0.0088,  0.2165]], device='cuda:0')
-    t[:, 0] = t[:, 0]*0
-    t[:, 2] = t[:, 2]*0
-    t = t.unsqueeze(1).repeat(1, kp.shape[1], 1)
-    kp_t = kp_rotated + t
+    trans[:, 0] = trans[:, 0]*0
+    trans[:, 2] = trans[:, 2]*0
+    trans = trans.unsqueeze(1).repeat(1, kp.shape[1], 1)
+    kp_t = kp_rotated + trans
 
     # add expression deviation 
     exp = exp.view(exp.shape[0], -1, 3) # [2, 45] ==> [2, 15, 3]
@@ -184,14 +166,12 @@ def keypoint_transform(kp, he: Dict[str, torch.Tensor]):
 
 
 class DownBlock2d(nn.Module):
-    """
-    Downsampling block for use in encoder.
-    """
+    """Downsampling block for use in encoder. """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
         super().__init__()
-        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
-                              padding=padding, groups=groups)
+        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, 
+                        kernel_size=kernel_size, padding=padding, groups=groups)
         self.norm = nn.BatchNorm2d(out_features, affine=True)
         self.pool = nn.AvgPool2d(kernel_size=(2, 2))
 
@@ -203,19 +183,14 @@ class DownBlock2d(nn.Module):
         return out
 
 class UpBlock3d(nn.Module):
-    """
-    Upsampling block for use in decoder.
-    """
-
+    """Upsampling block for use in decoder. """
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
         super().__init__()
-
-        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
-                              padding=padding, groups=groups)
+        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, 
+                        kernel_size=kernel_size, padding=padding, groups=groups)
         self.norm = nn.BatchNorm3d(out_features, affine=True)
 
     def forward(self, x):
-        # out = F.interpolate(x, scale_factor=(1, 2, 2), mode='trilinear')
         out = F.interpolate(x, scale_factor=(1.0, 2.0, 2.0))
         out = self.conv(out)
         out = self.norm(out)

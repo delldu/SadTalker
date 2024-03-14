@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from SAD.util import make_coordinate_grid, UpBlock3d
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 import todos
 import pdb
 
@@ -59,38 +59,49 @@ class DenseMotionNetwork(nn.Module):
         identity_grid = identity_grid.view(1, 1, d, h, w, 3)
         coordinate_grid = identity_grid - audio_kp.view(bs, self.num_kp, 1, 1, 1, 3)
         
-        driving_to_source = coordinate_grid + image_kp.view(bs, self.num_kp, 1, 1, 1, 3)    # (bs, num_kp, d, h, w, 3)
+        driving_to_source = coordinate_grid + image_kp.view(bs, self.num_kp, 1, 1, 1, 3)
 
-        #adding background feature
+        #Add background feature
         identity_grid = identity_grid.repeat(bs, 1, 1, 1, 1, 1)
-        sparse_motions = torch.cat([identity_grid, driving_to_source], dim=1)                #bs num_kp+1 d h w 3
-        
-        # sparse_motions = driving_to_source
+        sparse_motions = torch.cat([identity_grid, driving_to_source], dim=1)
 
         return sparse_motions
 
     def create_deformed_feature(self, feature, sparse_motions):
+        # tensor [feature] size: [1, 4, 16, 128, 128], min: 0.0, max: 2.637389, mean: 0.091283
+        # tensor [sparse_motions] size: [1, 16, 16, 128, 128, 3], min: -1.089367, max: 1.029755, mean: -0.020543
+
         bs, _, d, h, w = feature.shape
-        feature_repeat = feature.unsqueeze(1).unsqueeze(1).repeat(1, self.num_kp+1, 1, 1, 1, 1, 1)      # (bs, num_kp+1, 1, c, d, h, w)
-        feature_repeat = feature_repeat.view(bs * (self.num_kp+1), -1, d, h, w)                         # (bs*(num_kp+1), c, d, h, w)
-        sparse_motions = sparse_motions.view((bs * (self.num_kp+1), d, h, w, -1))                       # (bs*(num_kp+1), d, h, w, 3) !!!!
+        feature_repeat = feature.unsqueeze(1).unsqueeze(1).repeat(1, self.num_kp+1, 1, 1, 1, 1, 1)
+        feature_repeat = feature_repeat.view(bs * (self.num_kp+1), -1, d, h, w)
+        sparse_motions = sparse_motions.view((bs * (self.num_kp+1), d, h, w, -1))
+
+        # tensor [feature_repeat] size: [16, 4, 16, 128, 128], min: 0.0, max: 2.637389, mean: 0.091283
+        # tensor [sparse_motions] size: [16, 16, 128, 128, 3], min: -1.089367, max: 1.029755, mean: -0.020543
         sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False)
-        sparse_deformed = sparse_deformed.view((bs, self.num_kp+1, -1, d, h, w))                        # (bs, num_kp+1, c, d, h, w)
+        # tensor [sparse_deformed] size: [16, 4, 16, 128, 128], min: 0.0, max: 2.138518, mean: 0.080648
+
+        sparse_deformed = sparse_deformed.view((bs, self.num_kp+1, -1, d, h, w))
         return sparse_deformed
 
     def create_heatmap_representations(self, feature, audio_kp, image_kp):
-        spatial_size: Tuple[int, int, int] = (feature.shape[3], feature.shape[4], feature.shape[5])
+        # tensor [feature] size: [1, 16, 4, 16, 128, 128], min: 0.0, max: 2.1357, mean: 0.080596
+        # tensor [audio_kp] size: [1, 15, 3], min: -1.062631, max: 0.829658, mean: -0.0615
+        # tensor [image_kp] size: [1, 15, 3], min: -1.141619, max: 0.832342, mean: -0.083755
+
+        spatial_size = (feature.shape[3], feature.shape[4], feature.shape[5]) # [16, 128, 128]
         gaussian_driving = keypoint2gaussion(audio_kp, spatial_size=spatial_size)
         gaussian_source = keypoint2gaussion(image_kp, spatial_size=spatial_size)
         heatmap = gaussian_driving - gaussian_source
 
         # adding background feature
-        zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1], spatial_size[2]).type(heatmap.type())
+        zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], 
+            spatial_size[1], spatial_size[2]).type(heatmap.type())
         heatmap = torch.cat([zeros, heatmap], dim=1)
-        heatmap = heatmap.unsqueeze(2)         # (bs, num_kp+1, 1, d, h, w)
+        heatmap = heatmap.unsqueeze(2)
         return heatmap
 
-    def forward(self, feature, audio_kp, image_kp) -> Dict[str, torch.Tensor]:
+    def forward(self, feature, audio_kp, image_kp) -> Tuple[torch.Tensor, torch.Tensor]:
         # tensor [feature] size: [1, 32, 16, 128, 128], min: -38.411057, max: 36.868614, mean: 1.234772
         # tensor [audio_kp] size: [1, 15, 3], min: -0.983468, max: 0.936596, mean: -0.00567
         # tensor [image_kp] size: [1, 15, 3], min: -0.847928, max: 0.93429, mean: 0.040402
@@ -101,7 +112,6 @@ class DenseMotionNetwork(nn.Module):
         feature = self.norm(feature)
         feature = F.relu(feature)
 
-        out_dict = dict()
         sparse_motion = self.create_sparse_motions(feature, audio_kp, image_kp)
         deformed_feature = self.create_deformed_feature(feature, sparse_motion)
 
@@ -109,36 +119,25 @@ class DenseMotionNetwork(nn.Module):
 
         input_ = torch.cat([heatmap, deformed_feature], dim=2)
         input_ = input_.view(bs, -1, d, h, w)
-
-        # input = deformed_feature.view(bs, -1, d, h, w)      # (bs, num_kp+1 * c, d, h, w)
-
         prediction = self.hourglass(input_)
-
 
         mask = self.mask(prediction)
         mask = F.softmax(mask, dim=1)
-        out_dict['mask'] = mask
-        mask = mask.unsqueeze(2)                                   # (bs, num_kp+1, 1, d, h, w)
-        
-        zeros_mask = torch.zeros_like(mask)   
-        mask = torch.where(mask < 1e-3, zeros_mask, mask) 
+        mask = mask.unsqueeze(2) # size(): [1, 16, 16, 128, 128] ==> [1, 16, 1, 16, 128, 128]
+        # zeros_mask = torch.zeros_like(mask)   
+        # mask = torch.where(mask < 1e-3, zeros_mask, mask) 
+        mask = mask.clamp(0.0)
 
-        sparse_motion = sparse_motion.permute(0, 1, 5, 2, 3, 4)    # (bs, num_kp+1, 3, d, h, w)
-        deformation = (sparse_motion * mask).sum(dim=1)            # (bs, 3, d, h, w)
-        deformation = deformation.permute(0, 2, 3, 4, 1)           # (bs, d, h, w, 3)
-
-        out_dict['deformation'] = deformation
+        sparse_motion = sparse_motion.permute(0, 1, 5, 2, 3, 4) # size() -- [1, 16, 3, 16, 128, 128]
+        deformation = (sparse_motion * mask).sum(dim=1)
+        deformation = deformation.permute(0, 2, 3, 4, 1)
 
         bs, c, d, h, w = prediction.shape
         prediction = prediction.view(bs, -1, h, w)
         occlusion_map = torch.sigmoid(self.occlusion(prediction))
-        out_dict['occlusion_map'] = occlusion_map
-
-        # out_dict is dict:
-        #     tensor [mask] size: [1, 16, 16, 128, 128], min: 0.0, max: 1.0, mean: 0.0625
-        #     tensor [deformation] size: [1, 16, 128, 128, 3], min: -1.006518, max: 1.07888, mean: 0.028499
-        #     tensor [occlusion_map] size: [1, 1, 128, 128], min: 0.87407, max: 0.998679, mean: 0.967596
-        return out_dict
+        # tensor [deformation] size: [1, 16, 128, 128, 3], min: -1.006518, max: 1.07888, mean: 0.028499
+        # tensor [occlusion_map] size: [1, 1, 128, 128], min: 0.87407, max: 0.998679, mean: 0.967596
+        return (deformation, occlusion_map)
 
 class HourglassEncoder(nn.Module):
     def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
@@ -154,7 +153,6 @@ class HourglassEncoder(nn.Module):
 
     def forward(self, x):
         # tensor [x] size: [1, 80, 16, 128, 128], min: -0.74504, max: 1.718306, mean: 0.059655
-
         outs = [x]
         for down_block in self.down_blocks:
             outs.append(down_block(outs[-1]))
@@ -181,7 +179,6 @@ class HourglassDecoder(nn.Module):
             up_blocks.append(UpBlock3d(in_filters, out_filters, kernel_size=3, padding=1))
 
         self.up_blocks = nn.ModuleList(up_blocks)
-        # self.out_filters = block_expansion
         self.out_filters = block_expansion + in_features
 
         self.conv = nn.Conv3d(in_channels=self.out_filters, out_channels=self.out_filters, kernel_size=3, padding=1)
@@ -207,9 +204,7 @@ class HourglassDecoder(nn.Module):
         return out
 
 class Hourglass(nn.Module):
-    """
-    Hourglass architecture.
-    """
+    """Hourglass architecture. """
 
     def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
         super().__init__()
@@ -257,9 +252,3 @@ class DownBlock3d(nn.Module):
         out = F.relu(out)
         out = self.pool(out)
         return out
-
-if __name__ == "__main__":
-    model = DenseMotionNetwork()
-    model = torch.jit.script(model)
-    print(model)
-    # ==> OK    

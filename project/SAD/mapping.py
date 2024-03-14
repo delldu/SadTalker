@@ -10,9 +10,8 @@
 #
 import torch
 import torch.nn as nn
-from SAD.util import load_weights
 
-from typing import Dict
+from typing import Tuple
 import todos
 
 import pdb
@@ -55,9 +54,7 @@ class MappingNet(nn.Module):
         self.fc_t = nn.Linear(descriptor_nc, 3)
         self.fc_exp = nn.Linear(descriptor_nc, 3*num_kp)
 
-        # load_weights(self, "models/MappingNet.pth")
-
-    def forward(self, input_3dmm) -> Dict[str, torch.Tensor]:
+    def forward(self, input_3dmm) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Audio Encoder --> Mapping ?"""
         # tensor [input_3dmm] size: [1, 70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
 
@@ -78,28 +75,13 @@ class MappingNet(nn.Module):
         yaw = self.fc_yaw(out)
         pitch = self.fc_pitch(out)
         roll = self.fc_roll(out)
-        t = self.fc_t(out)
+        trans = self.fc_t(out)
         exp = self.fc_exp(out)
 
-        output =  {'yaw': yaw, 'pitch': pitch, 'roll': roll, 't': t, 'exp': exp} 
-        # output is dict:
-        #     tensor [yaw] size: [1, 66], min: -3.959461, max: 4.397331, mean: 0.079592
-        #     tensor [pitch] size: [1, 66], min: -4.535993, max: 5.854048, mean: -0.505516
-        #     tensor [roll] size: [1, 66], min: -3.812059, max: 6.655958, mean: -0.263339
-        #     tensor [t] size: [1, 3], min: -0.058004, max: 0.227935, mean: 0.068895
-        #     tensor [exp] size: [1, 45], min: -0.102243, max: 0.015078, mean: -0.002095
+        # tensor [yaw] size: [1, 66], min: -3.959461, max: 4.397331, mean: 0.079592
+        # tensor [pitch] size: [1, 66], min: -4.535993, max: 5.854048, mean: -0.505516
+        # tensor [roll] size: [1, 66], min: -3.812059, max: 6.655958, mean: -0.263339
+        # tensor [trans] size: [1, 3], min: -0.058004, max: 0.227935, mean: 0.068895
+        # tensor [exp] size: [1, 45], min: -0.102243, max: 0.015078, mean: -0.002095
 
-        return output
-
-
-
-if __name__ == "__main__":
-    model = MappingNet()
-
-    # from torch.fx import symbolic_trace
-    # model = symbolic_trace(model)    
-    model = torch.jit.script(model)
-
-    print(model)
-    # ==> OK
-
+        return (yaw, pitch, roll, trans, exp) # output
