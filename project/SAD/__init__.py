@@ -23,8 +23,7 @@ import todos
 import torchaudio
 from torchvision.transforms import Compose, ToTensor
 from SAD.sad import SADModel
-from SAD.debug import debug_var
-
+import todos
 import pdb
 
 
@@ -133,11 +132,11 @@ def predict(audio_file, image_file, output_dir):
     # load audio
     audio = load_wav(audio_file)
     audio_tensor = audio.to(device)
-    # tensor [audio_tensor] size: [200, 640] , min: tensor(-1.0130, device='cuda:0') , max: tensor(1.0737, device='cuda:0')
+    # tensor [audio_tensor] size: [200, 640] , min: -1.0130 , max: 1.0737
 
     image = Image.open(image_file).convert("RGB")
     image_tensor = ToTensor()(image).unsqueeze(0).to(device)
-    # tensor [image_tensor] size: [1, 3, 512, 512] , min: tensor(0.1176, device='cuda:0') , max: tensor(1., device='cuda:0')
+    # tensor [image_tensor] size: [1, 3, 512, 512] , min: 0.1176, max: 1.
 
     with torch.no_grad():
         output_tensor = model(audio_tensor, image_tensor)

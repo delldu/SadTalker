@@ -10,11 +10,10 @@
 #
 import torch
 from torch import nn
-
 from SAD.util import load_weights
-from SAD.debug import debug_var
 
 from typing import Dict, List
+import todos
 import pdb
 
 class Audio2Pose(nn.Module):
@@ -44,7 +43,6 @@ class Audio2Pose(nn.Module):
 
 
     def forward(self, x: Dict[str, torch.Tensor]):
-        # debug_var("Audio2Pose.x", x)
         # Audio2Pose.x is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
@@ -322,7 +320,6 @@ class Decoder(nn.Module):
         self.classbias = nn.Parameter(torch.randn(self.num_classes, latent_size))
 
     def forward(self, batch: Dict[str, torch.Tensor]):
-        # debug_var("Decoder.batch", batch)
         # Decoder.batch is dict:
         #     tensor image_pose size: [1, 6] , min: tensor(-0.0195, device='cuda:0') , max: tensor(0.2540, device='cuda:0')
         #     tensor class size: [1] , min: tensor(0, device='cuda:0') , max: tensor(0, device='cuda:0')

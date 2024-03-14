@@ -90,8 +90,7 @@ def conv1x1(in_planes: int, out_planes: int, stride: int = 1, bias: bool = False
 class BasicBlock(nn.Module):
     expansion: int = 1
 
-    def __init__(
-        self,
+    def __init__(self,
         inplanes: int,
         planes: int,
         stride: int = 1,
@@ -100,8 +99,8 @@ class BasicBlock(nn.Module):
         base_width: int = 64,
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None
-    ) -> None:
-        super(BasicBlock, self).__init__()
+    ):
+        super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if groups != 1 or base_width != 64:
@@ -155,7 +154,7 @@ class Bottleneck(nn.Module):
         dilation: int = 1,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ):
-        super(Bottleneck, self).__init__()
+        super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         width = int(planes * (base_width / 64.)) * groups
@@ -204,7 +203,7 @@ class ResNet(nn.Module):
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ):
-        super(ResNet, self).__init__()
+        super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer

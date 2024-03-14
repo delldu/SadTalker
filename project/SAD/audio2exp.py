@@ -11,9 +11,9 @@
 import torch
 from torch import nn
 from SAD.util import load_weights
-from SAD.debug import debug_var
 
 from typing import Dict, List
+import todos
 import pdb
 
 class Audio2Exp(nn.Module):
@@ -21,13 +21,8 @@ class Audio2Exp(nn.Module):
         super().__init__()
         self.netG = Audio2ExpWrapperV2()
 
-        # load_weights(self, "models/Audio2Exp.pth")
-
-        # torch.jit.script(self) ==> batch ???
-        # torch.jit.script(self.netG) ==> OK
 
     def forward(self, batch: Dict[str, torch.Tensor]):
-        # debug_var("Audio2Exp.batch", batch)
         # Audio2Exp.batch is dict:
         #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
         #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')

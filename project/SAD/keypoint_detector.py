@@ -17,10 +17,9 @@ from SAD.util import (
     make_coordinate_grid, 
     load_weights,
 )
-from SAD.debug import debug_var
 
 from typing import Dict
-
+import todos
 import pdb
 
 class KPDetector(nn.Module):
@@ -52,7 +51,6 @@ class KPDetector(nn.Module):
             num_blocks=5, 
             temperature=0.1, 
             scale_factor=0.25,
-            # estimate_jacobian=False, 
         ):
         super().__init__()
         self.predictor = KPHourglass(block_expansion, in_features=image_channel,

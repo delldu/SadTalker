@@ -12,13 +12,11 @@
 #  * SAD inference module
 # '''
 
-# import os
-# import numpy as np
+
 import random
 import torch
 from torch import nn
-# import torch.nn.functional as F
-# import torchvision.transforms as T
+
 
 import torchaudio
 
@@ -28,9 +26,9 @@ from SAD.sadkernel import SADKernel
 from SAD.keypoint_detector import KPDetector
 from SAD.mapping import MappingNet
 from SAD.util import load_weights, keypoint_transform
-from SAD.debug import debug_var
 
 from tqdm import tqdm
+import todos
 import pdb
 
 
