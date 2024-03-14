@@ -23,23 +23,19 @@ class Audio2Exp(nn.Module):
 
 
     def forward(self, batch: Dict[str, torch.Tensor]):
-        # Audio2Exp.batch is dict:
-        #     tensor audio_mels size: [1, 200, 1, 80, 16] , min: tensor(-4., device='cuda:0') , max: tensor(2.5998, device='cuda:0')
-        #     tensor image_exp_pose size: [1, 200, 70] , min: tensor(-1.0968, device='cuda:0') , max: tensor(1.1307, device='cuda:0')
-        ##    num_frames value: 200
-        #     tensor audio_ratio size: [1, 200, 1] , min: tensor(0., device='cuda:0') , max: tensor(1., device='cuda:0')
+        # batch is dict:
+        #     tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+        #     tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
+        #     tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.58
 
         mel_input = batch['audio_mels'] # [1, 200, 1, 80, 16]
-        T = mel_input.shape[1] # [200, 1, 80, 16], T -- batch size
+        T = mel_input.shape[1] # ==> 200
 
         exp_predict_list: List[torch.Tensor] = []
 
         for i in range(0, T, 10): # every 10 frames
             current_mel_input = mel_input[:,i:i+10]
             audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
-
-            # image_exp = batch['image_exp_pose'][:, i:i+10, 0:64] # size() -- [1, 10, 64]
-            # audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
 
             image_exp = batch['image_exp_pose'][:, :, :64][:, i:i+10] # size() -- [1, 10, 64]
             audio_ratio = batch['audio_ratio'][:, i:i+10]  # size() -- [1, 10, 1]
@@ -50,28 +46,53 @@ class Audio2Exp(nn.Module):
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!            
 
             exp_predict_list += [y] # size() -- [1, 10, 64]
+
+        # exp_predict_list is list: len = 20
+        #     tensor [item] size: [1, 10, 64], min: -1.311815, max: 1.241706, mean: -0.000448
+        #     tensor [item] size: [1, 10, 64], min: -1.364266, max: 1.255959, mean: -0.02406
+        #     tensor [item] size: [1, 10, 64], min: -1.552488, max: 1.167077, mean: -0.0372
+        #     tensor [item] size: [1, 10, 64], min: -1.5613, max: 1.150637, mean: -0.001518
+        #     tensor [item] size: [1, 10, 64], min: -1.580263, max: 1.061502, mean: 0.001655
+        #     tensor [item] size: [1, 10, 64], min: -1.627089, max: 1.103876, mean: -0.011172
+        #     tensor [item] size: [1, 10, 64], min: -1.567412, max: 1.131279, mean: -0.018819
+        #     tensor [item] size: [1, 10, 64], min: -1.687893, max: 1.210682, mean: 0.002061
+        #     tensor [item] size: [1, 10, 64], min: -1.600986, max: 1.272287, mean: -0.026018
+        #     tensor [item] size: [1, 10, 64], min: -1.524887, max: 1.095324, mean: -0.01195
+        #     tensor [item] size: [1, 10, 64], min: -1.437329, max: 1.098599, mean: -0.022959
+        #     tensor [item] size: [1, 10, 64], min: -1.516859, max: 1.124349, mean: 0.000906
+        #     tensor [item] size: [1, 10, 64], min: -1.537028, max: 1.128842, mean: -0.003933
+        #     tensor [item] size: [1, 10, 64], min: -1.557146, max: 1.139126, mean: -0.033007
+        #     tensor [item] size: [1, 10, 64], min: -1.526489, max: 1.242088, mean: -0.024945
+        #     tensor [item] size: [1, 10, 64], min: -1.553389, max: 1.113343, mean: -0.02658
+        #     tensor [item] size: [1, 10, 64], min: -1.493207, max: 1.161809, mean: 0.000331
+        #     tensor [item] size: [1, 10, 64], min: -1.465599, max: 1.08634, mean: -0.032512
+        #     tensor [item] size: [1, 10, 64], min: -1.730661, max: 1.10253, mean: -0.002466
+        #     tensor [item] size: [1, 10, 64], min: -1.622588, max: 1.211561, mean: 0.006403
         return torch.cat(exp_predict_list, dim=1) # size() -- [1, 200, 64]
 
 
 class Conv2d(nn.Module):
-    def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    # def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    def __init__(self, cin, cout, kernel_size, stride, padding, residual=False, use_act = True):
+        super().__init__()
         self.conv_block = nn.Sequential(
                             nn.Conv2d(cin, cout, kernel_size, stride, padding),
                             nn.BatchNorm2d(cout)
-                            )
+                        )
         self.act = nn.ReLU()
         self.residual = residual
         self.use_act = use_act
 
     def forward(self, x):
         out = self.conv_block(x)
-        if self.residual:
+        if self.residual: # True or False
             out += x
         
-        if self.use_act:
+        if self.use_act: # ==== True
             return self.act(out)
         else:
+            pdb.set_trace()
             return out
 
 class Audio2ExpWrapperV2(nn.Module):
@@ -95,19 +116,23 @@ class Audio2ExpWrapperV2(nn.Module):
 
             Conv2d(256, 512, kernel_size=3, stride=1, padding=0),
             Conv2d(512, 512, kernel_size=1, stride=1, padding=0),
-            )
+        )
 
         self.mapping1 = nn.Linear(512+64+1, 64)
-        nn.init.constant_(self.mapping1.bias, 0.)
+        # nn.init.constant_(self.mapping1.bias, 0.)
 
     def forward(self, audio_mel, image_exp, audio_ratio):
-        # audio_mel.size() -- [10, 1, 80, 16]
+        # tensor [audio_mel] size: [10, 1, 80, 16], min: -3.269791, max: 0.703544, mean: -1.632042
+        # tensor [image_exp] size: [1, 10, 64], min: -1.156697, max: 1.459776, mean: 0.036036
+        # tensor [audio_ratio] size: [1, 10, 1], min: 0.0, max: 0.0, mean: 0.0
+
         audio_mel = self.audio_encoder(audio_mel).view(audio_mel.size(0), -1) # size() -- [10, 512]
         ref_reshape = image_exp.reshape(audio_mel.size(0), -1) # size() -- [10, 64]
         audio_ratio = audio_ratio.reshape(audio_mel.size(0), -1) # size() -- [10, 1]
         
         y = self.mapping1(torch.cat([audio_mel, ref_reshape, audio_ratio], dim=1)) # size() -- [10, 64]
         out = y.reshape(image_exp.shape[0], image_exp.shape[1], -1) # size() -- [1, 10, 64]
+        # tensor [out] size: [1, 10, 64], min: -1.311815, max: 1.241706, mean: -0.000448
 
         return out
 

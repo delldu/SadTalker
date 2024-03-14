@@ -13,6 +13,8 @@ import torch.nn as nn
 from SAD.util import load_weights
 
 from typing import Dict
+import todos
+
 import pdb
 
 class MappingNet(nn.Module):
@@ -56,13 +58,17 @@ class MappingNet(nn.Module):
         # load_weights(self, "models/MappingNet.pth")
 
     def forward(self, input_3dmm) -> Dict[str, torch.Tensor]:
+        """Audio Encoder --> Mapping ?"""
+        # tensor [input_3dmm] size: [1, 70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
+
         out = self.first(input_3dmm)
+        # tensor [out] size: [1, 1024, 21], min: -1.797052, max: 0.736073, mean: -0.228992
 
         # to support torch.jit.script
         # for i in range(self.layer): # self.layer -- 3
         #     model = getattr(self, 'encoder' + str(i))
         #     out = model(out) + out[:,:, 3:-3]
-        out = self.encoder0(out) + out[:,:, 3:-3]
+        out = self.encoder0(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 15]
         out = self.encoder1(out) + out[:,:, 3:-3]
         out = self.encoder2(out) + out[:,:, 3:-3]
 
@@ -75,7 +81,16 @@ class MappingNet(nn.Module):
         t = self.fc_t(out)
         exp = self.fc_exp(out)
 
-        return {'yaw': yaw, 'pitch': pitch, 'roll': roll, 't': t, 'exp': exp} 
+        output =  {'yaw': yaw, 'pitch': pitch, 'roll': roll, 't': t, 'exp': exp} 
+        # output is dict:
+        #     tensor [yaw] size: [1, 66], min: -3.959461, max: 4.397331, mean: 0.079592
+        #     tensor [pitch] size: [1, 66], min: -4.535993, max: 5.854048, mean: -0.505516
+        #     tensor [roll] size: [1, 66], min: -3.812059, max: 6.655958, mean: -0.263339
+        #     tensor [t] size: [1, 3], min: -0.058004, max: 0.227935, mean: 0.068895
+        #     tensor [exp] size: [1, 45], min: -0.102243, max: 0.015078, mean: -0.002095
+
+        return output
+
 
 
 if __name__ == "__main__":

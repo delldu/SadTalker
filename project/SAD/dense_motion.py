@@ -13,11 +13,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from SAD.util import make_coordinate_grid, UpBlock3d
 from typing import Dict, List, Tuple
+import todos
 import pdb
 
 class DenseMotionNetwork(nn.Module):
     """
-    Module that predicting a dense motion from sparse motion representation 
+    Predict a dense motion from sparse motion representation 
     given by image_kp and audio_kp
     src/config/facerender.yaml
         dense_motion_params:
@@ -79,8 +80,8 @@ class DenseMotionNetwork(nn.Module):
 
     def create_heatmap_representations(self, feature, audio_kp, image_kp):
         spatial_size: Tuple[int, int, int] = (feature.shape[3], feature.shape[4], feature.shape[5])
-        gaussian_driving = kp2gaussian(audio_kp, spatial_size=spatial_size, kp_variance=0.01)
-        gaussian_source = kp2gaussian(image_kp, spatial_size=spatial_size, kp_variance=0.01)
+        gaussian_driving = keypoint2gaussion(audio_kp, spatial_size=spatial_size)
+        gaussian_source = keypoint2gaussion(image_kp, spatial_size=spatial_size)
         heatmap = gaussian_driving - gaussian_source
 
         # adding background feature
@@ -90,6 +91,10 @@ class DenseMotionNetwork(nn.Module):
         return heatmap
 
     def forward(self, feature, audio_kp, image_kp) -> Dict[str, torch.Tensor]:
+        # tensor [feature] size: [1, 32, 16, 128, 128], min: -38.411057, max: 36.868614, mean: 1.234772
+        # tensor [audio_kp] size: [1, 15, 3], min: -0.983468, max: 0.936596, mean: -0.00567
+        # tensor [image_kp] size: [1, 15, 3], min: -0.847928, max: 0.93429, mean: 0.040402
+        
         bs, _, d, h, w = feature.shape
 
         feature = self.compress(feature)
@@ -129,6 +134,10 @@ class DenseMotionNetwork(nn.Module):
         occlusion_map = torch.sigmoid(self.occlusion(prediction))
         out_dict['occlusion_map'] = occlusion_map
 
+        # out_dict is dict:
+        #     tensor [mask] size: [1, 16, 16, 128, 128], min: 0.0, max: 1.0, mean: 0.0625
+        #     tensor [deformation] size: [1, 16, 128, 128, 3], min: -1.006518, max: 1.07888, mean: 0.028499
+        #     tensor [occlusion_map] size: [1, 1, 128, 128], min: 0.87407, max: 0.998679, mean: 0.967596
         return out_dict
 
 class HourglassEncoder(nn.Module):
@@ -144,9 +153,19 @@ class HourglassEncoder(nn.Module):
         self.down_blocks = nn.ModuleList(down_blocks)
 
     def forward(self, x):
+        # tensor [x] size: [1, 80, 16, 128, 128], min: -0.74504, max: 1.718306, mean: 0.059655
+
         outs = [x]
         for down_block in self.down_blocks:
             outs.append(down_block(outs[-1]))
+
+        # outs is list: len = 6
+        #     tensor [item] size: [1, 80, 16, 128, 128], min: -0.74504, max: 1.718306, mean: 0.059655
+        #     tensor [item] size: [1, 64, 16, 64, 64], min: 0.0, max: 13.028785, mean: 0.24038
+        #     tensor [item] size: [1, 128, 16, 32, 32], min: 0.0, max: 14.465733, mean: 0.17052
+        #     tensor [item] size: [1, 256, 16, 16, 16], min: 0.0, max: 9.857283, mean: 0.15933
+        #     tensor [item] size: [1, 512, 16, 8, 8], min: 0.0, max: 4.83479, mean: 0.163259
+        #     tensor [item] size: [1, 1024, 16, 4, 4], min: 0.0, max: 4.537486, mean: 0.163623
         return outs
 
 
@@ -169,22 +188,22 @@ class HourglassDecoder(nn.Module):
         self.norm = nn.BatchNorm3d(self.out_filters, affine=True)
 
     def forward(self, x: List[torch.Tensor]):
-        # (Pdb) x[0].size() torch.Size([1, 80, 16, 128, 128])
-        # (Pdb) x[1].size() torch.Size([1, 64, 16, 64, 64])
-        # (Pdb) x[2].size() torch.Size([1, 128, 16, 32, 32])
-        # (Pdb) x[3].size() torch.Size([1, 256, 16, 16, 16])
-        # (Pdb) x[4].size() torch.Size([1, 512, 16, 8, 8])
-        # (Pdb) x[5].size() torch.Size([1, 1024, 16, 4, 4])
+        # x is list: len = 6
+        #     tensor [item] size: [1, 80, 16, 128, 128], min: -0.735851, max: 1.619775, mean: 0.059744
+        #     tensor [item] size: [1, 64, 16, 64, 64], min: 0.0, max: 12.833364, mean: 0.240246
+        #     tensor [item] size: [1, 128, 16, 32, 32], min: 0.0, max: 14.146493, mean: 0.170355
+        #     tensor [item] size: [1, 256, 16, 16, 16], min: 0.0, max: 9.610794, mean: 0.15924
+        #     tensor [item] size: [1, 512, 16, 8, 8], min: 0.0, max: 4.751517, mean: 0.163225
+        #     tensor [item] size: [1, 1024, 16, 4, 4], min: 0.0, max: 4.511559, mean: 0.163519
         out = x.pop()
-        # for up_block in self.up_blocks[:-1]:
         for up_block in self.up_blocks:
             out = up_block(out)
             skip = x.pop()
             out = torch.cat([out, skip], dim=1)
-        # out = self.up_blocks[-1](out)
         out = self.conv(out)
         out = self.norm(out)
         out = F.relu(out)
+        # tensor [out] size: [1, 112, 16, 128, 128], min: 0.0, max: 0.309183, mean: 0.004572
         return out
 
 class Hourglass(nn.Module):
@@ -201,7 +220,7 @@ class Hourglass(nn.Module):
     def forward(self, x):
         return self.decoder(self.encoder(x))
 
-def kp2gaussian(kp, spatial_size: Tuple[int, int, int], kp_variance: float):
+def keypoint2gaussion(kp, spatial_size: Tuple[int, int, int]):
     """
     Transform a keypoint into gaussian like representation
     """
@@ -214,8 +233,9 @@ def kp2gaussian(kp, spatial_size: Tuple[int, int, int], kp_variance: float):
     # Preprocess kp shape
     mean = mean.unsqueeze(2).unsqueeze(2).unsqueeze(2) # [1, 15, 3] ==> [1, 15, 1, 1, 1, 3]
 
-    mean_sub = (coordinate_grid - mean)
-    out = torch.exp(-0.5 * (mean_sub ** 2).sum(-1) / kp_variance)
+    kp_variance=0.01
+    mean = (coordinate_grid - mean)
+    out = torch.exp(-0.5 * (mean ** 2).sum(-1) / kp_variance)
 
     return out
 

@@ -16,6 +16,7 @@ from torch.nn import init
 from SAD.util import load_weights
 
 from typing import Type, Any, Callable, Union, List, Optional
+import todos
 import pdb
 
 
@@ -47,6 +48,8 @@ class Image2Coeff(nn.Module):
         # load_weights(self, "models/Image2Coeff.pth")
 
     def forward(self, x):
+        # tensor [x] size: [1, 3, 512, 512], min: 0.117647, max: 1.0, mean: 0.644081
+
         # resize to Bx3x224x224
         x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=False)
 
@@ -63,10 +66,13 @@ class Image2Coeff(nn.Module):
         # angle = x[:, 224: 227], dim = 3
         # gamma = x[:, 227: 254]
         # trans = x[:, 254: 257], dim = 3
-        # ==> exp + angle + trans, total dim is 
+        # ==> exp + angle + trans, total dim is 70
         ##################################################
 
-        return torch.cat((x[:, 80:144], x[:, 224:227], x[:, 254:257]), dim=1)
+        output = torch.cat((x[:, 80:144], x[:, 224:227], x[:, 254:257]), dim=1)
+        # tensor [output] size: [1, 70], min: -1.156697, max: 1.459776, mean: 0.023419
+
+        return output
 
 __all__ = ['ResNet', 'resnet50']
 
@@ -116,6 +122,8 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
+        pdb.set_trace()
+
     def forward(self, x):
         identity = x
 
@@ -157,6 +165,11 @@ class Bottleneck(nn.Module):
         super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
+            pdb.set_trace()
+        else:
+            pass
+            # ==> pdb.set_trace()
+
         width = int(planes * (base_width / 64.)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
@@ -183,8 +196,11 @@ class Bottleneck(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
 
-        if self.downsample is not None:
+        if self.downsample is not None: # True or False
             identity = self.downsample(x)
+        else:
+            pass
+            # ==> pdb.set_trace()
 
         out += identity
         out = self.relu(out)

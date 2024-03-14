@@ -97,19 +97,21 @@ class SADKernel(nn.Module):
 
         # load_weights(self, "models/SADKernel.pth")
 
-        # torch.jit.script(self) ==> Error !
-        # torch.jit.script(self.decoder) ==> AttributeError: 'SpectralNorm' object has no attribute '__name__'
-        # torch.jit.script(self.third)
-        # torch.jit.script(self.fourth)
-
 
     def deform_input(self, inp, deformation):
         _, _, d, h, w = inp.shape
         _, d_old, h_old, w_old, _ = deformation.shape
         if d_old != d or h_old != h or w_old != w:
+            pdb.set_trace()
             deformation = deformation.permute(0, 4, 1, 2, 3)
             deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
             deformation = deformation.permute(0, 2, 3, 4, 1)
+
+        # _, _, d, h, w = inp.shape
+        # deformation = deformation.permute(0, 4, 1, 2, 3)
+        # deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
+        # deformation = deformation.permute(0, 2, 3, 4, 1)
+ 
         return F.grid_sample(inp, deformation, align_corners=False)
 
     def forward(self, source_image, audio_kp, image_kp):

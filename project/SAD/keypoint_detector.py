@@ -22,7 +22,7 @@ from typing import Dict
 import todos
 import pdb
 
-class KPDetector(nn.Module):
+class KeypointDetector(nn.Module):
     """
     src/config/facerender.yml
       common_params:
@@ -53,9 +53,9 @@ class KPDetector(nn.Module):
             scale_factor=0.25,
         ):
         super().__init__()
-        self.predictor = KPHourglass(block_expansion, in_features=image_channel,
-                                     max_features=max_features, reshape_features=reshape_channel,
-                                     reshape_depth=reshape_depth, num_blocks=num_blocks)
+        self.predictor = KeypointHourglass(block_expansion, in_features=image_channel,
+                             max_features=max_features, reshape_features=reshape_channel,
+                             reshape_depth=reshape_depth, num_blocks=num_blocks)
 
         self.kp = nn.Conv3d(in_channels=self.predictor.out_filters, out_channels=num_kp, 
             kernel_size=3, padding=1)
@@ -65,16 +65,12 @@ class KPDetector(nn.Module):
         if self.scale_factor != 1:
             self.down = AntiAliasInterpolation2d(image_channel, self.scale_factor)
         else: # To support torch.jit.script
+            pdb.set_trace()
             self.down = nn.Identity()
 
-        # load_weights(self, "models/KPDetector.pth")
+        # load_weights(self, "models/KeypointDetector.pth")
 
-        # torch.jit.script(self)  ==> Error
-        # torch.jit.script(self.predictor) ==> Error
-        # torch.jit.script(self.kp)
-        # torch.jit.script(self.down)
-
-    def gaussian2kp(self, heatmap):
+    def gaussian2keypoint(self, heatmap):
         """
         Extract the mean from a heatmap
         """
@@ -88,7 +84,7 @@ class KPDetector(nn.Module):
         return value
 
     def forward(self, x):
-        # tensor [x] size: [1, 3, 512, 512] , min: tensor(0.1176, device='cuda:0') , max: tensor(1., device='cuda:0')
+        # tensor [x] size: [1, 3, 512, 512], min: 0.117647, max: 1.0, mean: 0.644081
         x = self.down(x)
 
         feature_map = self.predictor(x)
@@ -98,10 +94,10 @@ class KPDetector(nn.Module):
         heatmap = prediction.view(final_shape[0], final_shape[1], -1)
         heatmap = F.softmax(heatmap / self.temperature, dim=2) # [1, 15, 262144]
 
-        # heatmap = heatmap.view(*final_shape) # torch.jit.script does not support
         heatmap = heatmap.reshape(final_shape)
 
-        out = self.gaussian2kp(heatmap)
+        out = self.gaussian2keypoint(heatmap)
+        # tensor [out] size: [1, 15, 3], min: -0.891859, max: 0.950069, mean: 0.015366
 
         return out
 
@@ -156,9 +152,9 @@ class AntiAliasInterpolation2d(nn.Module):
         return out
 
 
-class KPHourglass(nn.Module):
+class KeypointHourglass(nn.Module):
     """
-    KPHourglass architecture.
+    KeypointHourglass architecture.
     """ 
 
     def __init__(self, block_expansion, in_features, reshape_features, reshape_depth, 
@@ -194,7 +190,7 @@ class KPHourglass(nn.Module):
         return out
         
 if __name__ == "__main__":
-    model = KPDetector()
+    model = KeypointDetector()
     model = torch.jit.script(model)    
     print(model)
     # ==> OK

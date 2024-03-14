@@ -152,10 +152,14 @@ def keypoint_transform(kp, he: Dict[str, torch.Tensor]):
 
     if 'yaw_in' in he: # False
         yaw = he['yaw_in']
+        pdb.set_trace()
     if 'pitch_in' in he: # False
         pitch = he['pitch_in']
+        pdb.set_trace()
+
     if 'roll_in' in he: # False
         roll = he['roll_in']
+        pdb.set_trace()
 
     rot_mat = get_rotation_matrix(yaw, pitch, roll)    # (bs, 3, 3)
 
@@ -176,7 +180,6 @@ def keypoint_transform(kp, he: Dict[str, torch.Tensor]):
     exp = exp.view(exp.shape[0], -1, 3) # [2, 45] ==> [2, 15, 3]
     kp_transformed = kp_t + exp
 
-    # return {'value': kp_transformed}
     return kp_transformed
 
 

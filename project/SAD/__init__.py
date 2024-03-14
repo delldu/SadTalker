@@ -84,17 +84,16 @@ def get_model():
     """Load jit script model."""
 
     model, device = create_model()
-    # print(model)
 
-    # https://github.com/pytorch/pytorch/issues/52286
-    torch._C._jit_set_profiling_executor(False)
-    # C++ Reference
-    # torch::jit::getProfilingMode() = false;                                                                                                             
-    # torch::jit::setTensorExprFuserEnabled(false);
+    # # https://github.com/pytorch/pytorch/issues/52286
+    # torch._C._jit_set_profiling_executor(False)
+    # # C++ Reference
+    # # torch::jit::getProfilingMode() = false;                                                                                                             
+    # # torch::jit::setTensorExprFuserEnabled(false);
 
-    model = torch.jit.script(model)
-    # model = torch.jit.freeze(model)
-    # model = torch.jit.optimize_for_inference(model)
+    # model = torch.jit.script(model)
+    # # model = torch.jit.freeze(model)
+    # # model = torch.jit.optimize_for_inference(model)
     
     # todos.data.mkdir("output")
     # if not os.path.exists("output/SAD.torch"):
@@ -134,7 +133,7 @@ def predict(audio_file, image_file, output_dir):
     audio_tensor = audio.to(device)
     # tensor [audio_tensor] size: [200, 640] , min: -1.0130 , max: 1.0737
 
-    image = Image.open(image_file).convert("RGB")
+    image = Image.open(image_file).convert("RGB").resize((512, 512))
     image_tensor = ToTensor()(image).unsqueeze(0).to(device)
     # tensor [image_tensor] size: [1, 3, 512, 512] , min: 0.1176, max: 1.
 
