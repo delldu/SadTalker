@@ -84,22 +84,25 @@ class DenseMotionNetwork(nn.Module):
         sparse_deformed = sparse_deformed.view((bs, self.num_kp+1, -1, d, h, w))
         return sparse_deformed
 
-    def create_heatmap_representations(self, feature, audio_kp, image_kp):
-        # tensor [feature] size: [1, 16, 4, 16, 128, 128], min: 0.0, max: 2.1357, mean: 0.080596
+    def create_heat_map(self, deform_feature, audio_kp, image_kp):
+        # tensor [deform_feature] size: [1, 16, 4, 16, 128, 128], min: 0.0, max: 2.1357, mean: 0.080596
         # tensor [audio_kp] size: [1, 15, 3], min: -1.062631, max: 0.829658, mean: -0.0615
         # tensor [image_kp] size: [1, 15, 3], min: -1.141619, max: 0.832342, mean: -0.083755
 
-        spatial_size = (feature.shape[3], feature.shape[4], feature.shape[5]) # [16, 128, 128]
-        gaussian_driving = keypoint2gaussion(audio_kp, spatial_size=spatial_size)
-        gaussian_source = keypoint2gaussion(image_kp, spatial_size=spatial_size)
-        heatmap = gaussian_driving - gaussian_source
+        spatial_size = (deform_feature.shape[3], deform_feature.shape[4], deform_feature.shape[5])
+        # spatial_size -- [16, 128, 128]
 
-        # adding background feature
+        gaussian_audio = keypoint2gaussion(audio_kp, spatial_size=spatial_size)
+        gaussian_image = keypoint2gaussion(image_kp, spatial_size=spatial_size)
+        heatmap = gaussian_audio - gaussian_image
+
+        # Adding background feature
         zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], 
             spatial_size[1], spatial_size[2]).type(heatmap.type())
         heatmap = torch.cat([zeros, heatmap], dim=1)
         heatmap = heatmap.unsqueeze(2)
-        return heatmap
+
+        return heatmap # size() -- [1, 16, 1, 16, 128, 128]
 
     def forward(self, feature, audio_kp, image_kp) -> Tuple[torch.Tensor, torch.Tensor]:
         # tensor [feature] size: [1, 32, 16, 128, 128], min: -38.411057, max: 36.868614, mean: 1.234772
@@ -115,7 +118,7 @@ class DenseMotionNetwork(nn.Module):
         sparse_motion = self.create_sparse_motions(feature, audio_kp, image_kp)
         deformed_feature = self.create_deformed_feature(feature, sparse_motion)
 
-        heatmap = self.create_heatmap_representations(deformed_feature, audio_kp, image_kp)
+        heatmap = self.create_heat_map(deformed_feature, audio_kp, image_kp)
 
         input_ = torch.cat([heatmap, deformed_feature], dim=2)
         input_ = input_.view(bs, -1, d, h, w)
@@ -220,25 +223,23 @@ def keypoint2gaussion(kp, spatial_size: Tuple[int, int, int]):
     Transform a keypoint into gaussian like representation
     """
     mean = kp # size() -- [1, 15, 3]
-
+    # sparse_size -- (16, 128, 128)
     coordinate_grid = make_coordinate_grid(spatial_size).to(kp.device) # [16, 128, 128, 3]
     coordinate_grid = coordinate_grid.unsqueeze(0).unsqueeze(0) # [1, 1, 16, 128, 128, 3]
     coordinate_grid = coordinate_grid.repeat(1, 15, 1, 1, 1, 1)
 
     # Preprocess kp shape
     mean = mean.unsqueeze(2).unsqueeze(2).unsqueeze(2) # [1, 15, 3] ==> [1, 15, 1, 1, 1, 3]
-
-    kp_variance=0.01
+    kp_variance = 0.01
     mean = (coordinate_grid - mean)
     out = torch.exp(-0.5 * (mean ** 2).sum(-1) / kp_variance)
 
-    return out
+    return out # size() -- [1, 15, 16, 128, 128]
 
 class DownBlock3d(nn.Module):
     """
     Downsampling block for use in encoder.
     """
-
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
         super().__init__()
         self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,

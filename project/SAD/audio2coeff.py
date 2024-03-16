@@ -37,15 +37,14 @@ class Audio2Coeff(nn.Module):
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            #46 styles can be selected 
-            batch_id = torch.LongTensor([pose_style]).to(exp_pred.device)
+            # 46 styles can be selected 
+            class_id = torch.LongTensor([pose_style]).to(exp_pred.device)
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred = self.audio2pose_model(audio_mels, image_exp_pose, audio_ratio, batch_id) # Audio2Pose(...)
+            pose_pred = self.audio2pose_model(audio_mels, image_exp_pose, audio_ratio, class_id) # Audio2Pose(...)
             # tensor [pose_pred] size: [1, 200, 6], min: -0.809749, max: 0.27462, mean: -0.102681
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            # coeffs_pred = torch.cat((exp_pred, pose_pred), dim=-1)
             coeffs_pred = torch.cat((exp_pred, pose_pred), dim=2)
             # tensor [coeffs_pred] size: [1, 200, 70], min: -1.690973, max: 1.272287, mean: -0.021126
 

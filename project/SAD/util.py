@@ -14,8 +14,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.nn.utils import remove_spectral_norm
+from typing import Tuple
 
-from typing import Dict, Tuple
+import todos
 import pdb
 
 def remove_sadkernel_spectral_norm(model):
@@ -78,6 +79,10 @@ def headpose_pred_to_degree(pred):
     return degree
 
 def get_rotation_matrix(yaw, pitch, roll):
+    # tensor [yaw] size: [1], min: 14.669785, max: 14.669785, mean: 14.669785
+    # tensor [pitch] size: [1], min: -14.523376, max: -14.523376, mean: -14.523376
+    # tensor [roll] size: [1], min: -3.038132, max: -3.038132, mean: -3.038132
+
     yaw = yaw / 180 * 3.14
     pitch = pitch / 180 * 3.14
     roll = roll / 180 * 3.14
@@ -91,10 +96,6 @@ def get_rotation_matrix(yaw, pitch, roll):
                           torch.zeros_like(pitch), torch.sin(pitch), torch.cos(pitch)], dim=1)
     pitch_mat = pitch_mat.view(pitch_mat.shape[0], 3, 3)
     # (Pdb) pitch_mat
-    # tensor([[[ 1.0000,  0.0000,  0.0000],
-    #          [ 0.0000,  0.9931,  0.1170],
-    #          [ 0.0000, -0.1170,  0.9931]],
-
     #         [[ 1.0000,  0.0000,  0.0000],
     #          [ 0.0000,  0.9931,  0.1170],
     #          [ 0.0000, -0.1170,  0.9931]]], device='cuda:0')
@@ -106,11 +107,7 @@ def get_rotation_matrix(yaw, pitch, roll):
     # (Pdb) yaw_mat
     # tensor([[[ 1.0000,  0.0000, -0.0021],
     #          [ 0.0000,  1.0000,  0.0000],
-    #          [ 0.0021,  0.0000,  1.0000]],
-
-    #         [[ 1.0000,  0.0000, -0.0021],
-    #          [ 0.0000,  1.0000,  0.0000],
-    #          [ 0.0021,  0.0000,  1.0000]]], device='cuda:0')
+    #          [ 0.0021,  0.0000,  1.0000]], device='cuda:0'
 
     roll_mat = torch.cat([torch.cos(roll), -torch.sin(roll), torch.zeros_like(roll),  
                          torch.sin(roll), torch.cos(roll), torch.zeros_like(roll),
@@ -119,23 +116,18 @@ def get_rotation_matrix(yaw, pitch, roll):
     # (Pdb) roll_mat
     # tensor([[[ 1.0000, -0.0071,  0.0000],
     #          [ 0.0071,  1.0000,  0.0000],
-    #          [ 0.0000,  0.0000,  1.0000]],
+    #          [ 0.0000,  0.0000,  1.0000]], device='cuda:0')
 
-    #         [[ 1.0000, -0.0071,  0.0000],
-    #          [ 0.0071,  1.0000,  0.0000],
-    #          [ 0.0000,  0.0000,  1.0000]]], device='cuda:0')
+    # tensor [pitch_mat] size: [1, 3, 3], min: -0.250651, max: 1.0, mean: 0.326239
+    # tensor [yaw_mat] size: [1, 3, 3], min: -0.253122, max: 1.0, mean: 0.326097
+    # tensor [roll_mat] size: [1, 3, 3], min: -0.052974, max: 1.0, mean: 0.333021
 
     rot_mat = torch.einsum('bij,bjk,bkm->bim', pitch_mat, yaw_mat, roll_mat)
     # (Pdb) rot_mat
     # tensor([[[ 1.0000, -0.0071, -0.0021],
     #          [ 0.0072,  0.9931,  0.1170],
-    #          [ 0.0012, -0.1170,  0.9931]],
-
-    #         [[ 1.0000, -0.0071, -0.0021],
-    #          [ 0.0072,  0.9931,  0.1170],
-    #          [ 0.0012, -0.1170,  0.9931]]], device='cuda:0')
-
-    return rot_mat
+    #          [ 0.0012, -0.1170,  0.9931]], device='cuda:0'
+    return rot_mat # size() -- [1, 3, 3]
 
 def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
     # kp -- [2, 15, 3]
@@ -149,7 +141,7 @@ def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
     # keypoint rotation
     kp_rotated = torch.einsum('bmp,bkp->bkm', rot_mat, kp)
 
-    # keypoint translation
+    # Keypoint translation
     # (Pdb) trans
     # tensor([[ 0.0084, -0.0088,  0.2165],
     #         [ 0.0084, -0.0088,  0.2165]], device='cuda:0')
@@ -158,7 +150,7 @@ def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
     trans = trans.unsqueeze(1).repeat(1, kp.shape[1], 1)
     kp_t = kp_rotated + trans
 
-    # add expression deviation 
+    # Add expression deviation 
     exp = exp.view(exp.shape[0], -1, 3) # [2, 45] ==> [2, 15, 3]
     kp_transformed = kp_t + exp
 

@@ -208,6 +208,76 @@ def export_audo_face_generator_onnx_model():
     print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
 
 
+def export_sad_onnx_model():
+    import onnx
+    import onnxruntime
+    from onnxsim import simplify
+    import onnxoptimizer
+
+    print("Export drive_face_generator onnx model ...")
+
+    # 1. Run torch model
+    model, device = SAD.get_model()
+
+    B, C, H, W = 1, 3, 512, 512
+    audio = torch.randn(20, 640).to(device) # offset_kp
+    image = torch.randn(B, C, H, W).to(device) # source_kp
+
+    # audio, image
+    with torch.no_grad():
+        dummy_output = model(audio, image)
+
+    torch_outputs = [dummy_output.cpu()]
+
+    # 2. Export onnx model
+    input_names = [ "audio", "image"]
+    output_names = [ "output" ]
+    onnx_filename = "output/audio_drive.onnx"
+
+    torch.onnx.export(model, 
+        (audio, image),
+        onnx_filename, 
+        verbose=False, 
+        input_names=input_names, 
+        output_names=output_names,
+        opset_version=16,
+    )
+
+    # 3. Check onnx model file
+    onnx_model = onnx.load(onnx_filename)
+    onnx.checker.check_model(onnx_model)
+
+    onnx_model, check = simplify(onnx_model)
+    assert check, "Simplified ONNX model could not be validated"
+    onnx_model = onnxoptimizer.optimize(onnx_model)
+    onnx.save(onnx_model, onnx_filename)
+    # print(onnx.helper.printable_graph(onnx_model.graph))
+
+    # 4. Run onnx model
+    if 'cuda' in device.type:
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CUDAExecutionProvider'])
+    else:        
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CPUExecutionProvider'])
+
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+    onnx_inputs = { input_names[0]: to_numpy(audio), 
+                    input_names[1]: to_numpy(image),
+                }
+    onnx_outputs = ort_session.run(None, onnx_inputs)
+
+    # 5.Compare output results
+    assert len(torch_outputs) == len(onnx_outputs)
+    for torch_output, onnx_output in zip(torch_outputs, onnx_outputs):
+        torch.testing.assert_close(torch_output, torch.tensor(onnx_output), rtol=0.05, atol=0.05)
+
+    todos.model.reset_device()
+
+    print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Smoke Test')
     parser.add_argument('-s', '--shape_test', action="store_true", help="test shape")
@@ -221,7 +291,8 @@ if __name__ == "__main__":
         run_bench_mark()
     if args.export_onnx:
         # export_drive_face_keypoint_onnx_model()
-        export_audo_face_generator_onnx_model()
+        # export_audo_face_generator_onnx_model()
+        export_sad_onnx_model()
     
     if not (args.shape_test or args.bench_mark or args.export_onnx):
         parser.print_help()

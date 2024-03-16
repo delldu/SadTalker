@@ -158,7 +158,7 @@ class KeypointHourglass(nn.Module):
         for i in range(num_blocks):
             in_filters = min(max_features, block_expansion * (2 ** (num_blocks - i)))
             out_filters = min(max_features, block_expansion * (2 ** (num_blocks - i - 1)))
-            self.up_blocks.add_module('up'+ str(i), UpBlock3d(in_filters, out_filters, kernel_size=3, padding=1))
+            self.up_blocks.add_module('up'+ str(i), UpBlock3d(in_filters, out_filters))
 
         self.reshape_depth = reshape_depth
         self.out_filters = out_filters
