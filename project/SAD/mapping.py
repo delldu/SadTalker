@@ -10,8 +10,9 @@
 #
 import torch
 import torch.nn as nn
+from SAD.util import keypoint_transform
 
-from typing import Tuple
+# from typing import Tuple
 import todos
 
 import pdb
@@ -54,11 +55,11 @@ class MappingNet(nn.Module):
         self.fc_t = nn.Linear(descriptor_nc, 3)
         self.fc_exp = nn.Linear(descriptor_nc, 3*num_kp)
 
-    def forward(self, input_3dmm) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, canonical_kp, input_3dmm):
         """Audio Encoder --> Mapping ?"""
         # tensor [input_3dmm] size: [1, 70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
 
-        out = self.first(input_3dmm)
+        out = self.first(input_3dmm.unsqueeze(0))
         # tensor [out] size: [1, 1024, 21], min: -1.797052, max: 0.736073, mean: -0.228992
 
         # to support torch.jit.script
@@ -84,4 +85,5 @@ class MappingNet(nn.Module):
         # tensor [trans] size: [1, 3], min: -0.058004, max: 0.227935, mean: 0.068895
         # tensor [exp] size: [1, 45], min: -0.102243, max: 0.015078, mean: -0.002095
 
-        return (yaw, pitch, roll, trans, exp) # output
+        # return (yaw, pitch, roll, trans, exp) # output
+        return keypoint_transform(canonical_kp, yaw, pitch, roll, trans, exp)

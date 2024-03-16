@@ -23,7 +23,8 @@ from SAD.audio2coeff import Audio2Coeff
 from SAD.sadkernel import SADKernel
 from SAD.keypoint_detector import KeypointDetector
 from SAD.mapping import MappingNet
-from SAD.util import load_weights, keypoint_transform
+from SAD.util import load_weights
+#, keypoint_transform
 from typing import Tuple
 from tqdm import tqdm
 import todos
@@ -47,24 +48,23 @@ def get_blink_seq_randomly(num_frames: int):
             break
     return ratio
 
-def transform_image_semantic(coeff_3dmm, semantic_radius: int=13):
-    # tensor [coeff_3dmm] size: [1, 70], min: -2.225995, max: 0.35268, mean: -0.052696
+def transform_image_semantic(image_exp_pose, semantic_radius: int=13):
+    # tensor [image_exp_pose] size: [1, 70], min: -2.225995, max: 0.35268, mean: -0.052696
     # semantic_radius note: 2-13 is lower power and important, others is almost noise !!!
-    # coeff_3dmm shape: (1, 70) , min: -1.0967898 , max: 1.13074
-    coeff_3dmm_list =  [coeff_3dmm for i in range(0, semantic_radius*2+1)]
+    coeff_3dmm_list =  [image_exp_pose for i in range(0, semantic_radius*2+1)]
     coeff_3dmm_g = torch.cat(coeff_3dmm_list, dim=0) # shape: (27, 70)
     return coeff_3dmm_g.transpose(1, 0) # ==> shape: (70, 27)
 
-def transform_audio_semantic(coeff_3dmm, frame_index: int, semantic_radius: int=13):
-    # tensor [coeff_3dmm] size: [200, 70], min: -2.489626, max: 0.524471, mean: -0.075972
-    num_frames = coeff_3dmm.shape[0]
+def transform_audio_semantic(audio_exp_pose, frame_index: int, semantic_radius: int=13):
+    # tensor [audio_exp_pose] size: [200, 70], min: -2.489626, max: 0.524471, mean: -0.075972
+    num_frames = audio_exp_pose.shape[0]
     seq = list(range(frame_index- semantic_radius, frame_index + semantic_radius+1))
     # seq -- [-13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0, 
     #     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     index = [ min(max(item, 0), num_frames-1) for item in seq ] 
     # index -- [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-    coeff_3dmm_g = coeff_3dmm[index, :] # shape -- (27, 70)
-    return coeff_3dmm_g.transpose(1,0) # ==> shape -- (70, 27)
+    coeff_3dmm_g = audio_exp_pose[index, :] # shape -- (27, 70)
+    return coeff_3dmm_g.transpose(1, 0) # ==> shape -- (70, 27)
 
 
 class SADModel(nn.Module):
@@ -81,6 +81,8 @@ class SADModel(nn.Module):
         self.mappingnet_model = MappingNet()
 
         load_weights(self, model_path="models/SAD.pth")
+
+
 
     def get_mel_spectrogram(self, wav):
         '''
@@ -160,14 +162,19 @@ class SADModel(nn.Module):
         # tensor [image_exp_pose] size: [1, 70], min: -1.156697, max: 1.459776, mean: 0.023419
 
         # image_he
-        yaw, pitch, roll, trans, exp = self.image_head_estimation(image_exp_pose)
+        # yaw, pitch, roll, trans, exp = self.image_head_estimation(image_exp_pose)
+        image_semantics = transform_image_semantic(image_exp_pose)
+        # tensor [image_semantics] size: [70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
+
+        # (yaw, pitch, roll, trans, exp) = self.mappingnet_model(image_semantics)
+
+
         # tensor [yaw] size: [1, 66], min: -3.959461, max: 4.397331, mean: 0.079592
         # tensor [pitch] size: [1, 66], min: -4.535993, max: 5.854048, mean: -0.505516
         # tensor [roll] size: [1, 66], min: -3.812059, max: 6.655958, mean: -0.263339
         # tensor [trans] size: [1, 3], min: -0.058004, max: 0.227935, mean: 0.068895
         # tensor [exp] size: [1, 45], min: -0.102243, max: 0.015078, mean: -0.002095
-
-        image_kp = keypoint_transform(canonical_kp, yaw, pitch, roll, trans, exp) # fine tunning for canonical_kp
+        image_kp = self.mappingnet_model(canonical_kp, image_semantics) # fine tunning for canonical_kp
         # tensor [image_kp] size: [1, 15, 3], min: -0.847928, max: 0.93429, mean: 0.040402
 
         num_frames = audio.shape[0]
@@ -185,11 +192,12 @@ class SADModel(nn.Module):
 
         output_list = []
         for i in tqdm(range(num_frames), 'Rendering'):
-            audio_semantics = transform_audio_semantic(audio_exp_pose, i).unsqueeze(0) # size() -- [1, 70, 27]
+            audio_semantics = transform_audio_semantic(audio_exp_pose, i)
+            # size() -- [70, 27]
 
             # audio_he
-            yaw, pitch, roll, trans, exp = self.mappingnet_model(audio_semantics)
-            audio_kp = keypoint_transform(canonical_kp, yaw, pitch, roll, trans, exp)
+            # yaw, pitch, roll, trans, exp = self.mappingnet_model(audio_semantics)
+            audio_kp = self.mappingnet_model(canonical_kp, audio_semantics)
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # size() -- [1, 3, 512, 512]
@@ -207,10 +215,10 @@ class SADModel(nn.Module):
         # tensor [output] size: [200, 3, 512, 512], min: 0.121079, max: 0.954297, mean: 0.62631
         return output
 
-    def image_head_estimation(self, image_exp_pose)->Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        image_semantics = transform_image_semantic(image_exp_pose).unsqueeze(0)
-        # tensor [image_semantics] size: [1, 70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
+    # def image_head_estimation(self, image_exp_pose)->Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    #     image_semantics = transform_image_semantic(image_exp_pose).unsqueeze(0)
+    #     # tensor [image_semantics] size: [1, 70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
 
-        # (yaw, pitch, roll, trans, exp) = self.mappingnet_model(image_semantics)
-        # return (yaw, pitch, roll, trans, exp)
-        return self.mappingnet_model(image_semantics)
+    #     # (yaw, pitch, roll, trans, exp) = self.mappingnet_model(image_semantics)
+    #     # return (yaw, pitch, roll, trans, exp)
+    #     return self.mappingnet_model(image_semantics)

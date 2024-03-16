@@ -13,7 +13,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from typing import Optional
 import todos
 import pdb
 
@@ -23,15 +22,7 @@ class Image2Coeff(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # net_recon='resnet50'
-        # if net_recon not in func_dict:
-        #     return  NotImplementedError('network [%s] is not implemented', net_recon)
-        # func, last_dim = func_dict[net_recon]
-        # backbone = func(num_classes=self.fc_dim)
-
-        # pdb.set_trace()
-        # self.backbone = backbone
-        self.backbone = ResNet(Bottleneck, [3, 4, 6, 3], {'num_classes': self.fc_dim})
+        self.backbone = ResNet([3, 4, 6, 3], {'num_classes': self.fc_dim})
         last_dim = 2048
         self.final_layers = nn.ModuleList([
             conv1x1(last_dim, 80, bias=True), # id layer
@@ -50,11 +41,11 @@ class Image2Coeff(nn.Module):
         # resize to Bx3x224x224
         x = F.interpolate(x, size=(224, 224), mode="bilinear", align_corners=False)
 
-        x = self.backbone(x)
+        x = self.backbone(x) # size() -- [1, 2048, 1, 1]
         output = []
         for layer in self.final_layers:
             output.append(layer(x))
-        x = torch.flatten(torch.cat(output, dim=1), 1)
+        x = torch.flatten(torch.cat(output, dim=1), 1) # x.size() -- [1, 257]
 
         ##################################################
         # id = x[:, :80]
@@ -71,21 +62,14 @@ class Image2Coeff(nn.Module):
 
         return output
 
-# __all__ = ['ResNet', 'resnet50']
 
-
-# model_urls = {
-#     'resnet50': 'https://download.pytorch.org/models/resnet50-0676ba61.pth',
-# }
-
-
-def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
+def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation)
 
 
-def conv1x1(in_planes: int, out_planes: int, stride: int = 1, bias: bool = False) -> nn.Conv2d:
+def conv1x1(in_planes: int, out_planes: int, stride: int = 1, bias: bool = False):
     """1x1 convolution"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=bias)
 
@@ -102,7 +86,6 @@ class Bottleneck(nn.Module):
         inplanes: int,
         planes: int,
         stride: int = 1,
-        downsample: Optional[nn.Module] = None,
         groups = 1,
         base_width = 64,
         dilation = 1,
@@ -111,7 +94,6 @@ class Bottleneck(nn.Module):
         super().__init__()
 
         width = int(planes * (base_width / 64.)) * groups
-        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
         self.bn1 = norm_layer(width)
         self.conv2 = conv3x3(width, width, stride, groups, dilation)
@@ -119,7 +101,6 @@ class Bottleneck(nn.Module):
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
         self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
 
     def forward(self, x):
         identity = x
@@ -135,15 +116,15 @@ class Bottleneck(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
 
-        if self.downsample is not None: # True or False
-            identity = self.downsample(x)
+        # self.downsample === None
+        # if self.downsample is not None: # True or False
+        #     identity = self.downsample(x)
 
         out += identity
         out = self.relu(out)
 
         return out
 
-# xxxx_8888
 class BottleneckWithDownsample(nn.Module):
     # Bottleneck in torchvision places the stride for downsampling at 3x3 convolution(self.conv2)
     # while original implementation places the stride at the first 1x1 convolution(self.conv1)
@@ -157,7 +138,7 @@ class BottleneckWithDownsample(nn.Module):
         inplanes: int,
         planes: int,
         stride: int = 1,
-        downsample: Optional[nn.Module] = None,
+        downsample= None,
         groups = 1,
         base_width = 64,
         dilation = 1,
@@ -174,6 +155,8 @@ class BottleneckWithDownsample(nn.Module):
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
         self.relu = nn.ReLU(inplace=True)
+
+        assert downsample is not None, "downsample must be not None"
         self.downsample = downsample
 
     def forward(self, x):
@@ -190,8 +173,7 @@ class BottleneckWithDownsample(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
 
-        if self.downsample is not None: # True or False
-            identity = self.downsample(x)
+        identity = self.downsample(x)
 
         out += identity
         out = self.relu(out)
@@ -201,7 +183,6 @@ class BottleneckWithDownsample(nn.Module):
 
 class ResNet(nn.Module):
     def __init__(self,
-        block,
         layers = [3, 4, 6, 3],
         num_classes = 1000,
         groups = 1,
@@ -217,42 +198,42 @@ class ResNet(nn.Module):
         self.dilation = 1
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.layer1 = self._make_layer(64, layers[0])
+        self.layer2 = self._make_layer(128, layers[1], stride=2)
+        self.layer3 = self._make_layer(256, layers[2], stride=2)
+        self.layer4 = self._make_layer(512, layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
 
-    def _make_layer(self, block, planes, blocks, stride = 1):
+    def _make_layer(self, planes, blocks, stride = 1):
+        expansion = Bottleneck.expansion # ---- 4
         norm_layer = self._norm_layer
         downsample = None
-
-        if stride != 1 or self.inplanes != planes * block.expansion:
+        if stride != 1 or self.inplanes != planes * expansion:
             downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
-                norm_layer(planes * block.expansion),
+                conv1x1(self.inplanes, planes * expansion, stride),
+                norm_layer(planes * expansion),
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
+        if downsample is not None:
+            layers.append(BottleneckWithDownsample(self.inplanes, planes, stride, downsample, self.groups,
+                            self.base_width, self.dilation, norm_layer))
+        else:
+            layers.append(Bottleneck(self.inplanes, planes, stride, self.groups, 
                             self.base_width, self.dilation, norm_layer))
 
-        self.inplanes = planes * block.expansion
+        self.inplanes = planes * expansion
         for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
+            layers.append(Bottleneck(self.inplanes, planes, groups=self.groups,
+                            base_width=self.base_width, dilation=self.dilation, norm_layer=norm_layer))
 
         return nn.Sequential(*layers)
 
-    # def _forward_impl(self, x):
-    #     # See note [TorchScript super()]
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -266,34 +247,3 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         return x
-
-    # def forward(self, x):
-    #     return self._forward_impl(x)
-
-# def _resnet(
-#     arch: str,
-#     block: Type[Union[Bottleneck]],
-#     layers: List[int],
-#     pretrained,
-#     progress,
-#     **kwargs
-# ):
-#     model = ResNet(block, layers, **kwargs)
-#     return model
-
-# def resnet50(pretrained = False, progress = True, **kwargs):
-#     r"""ResNet-50 model from
-#     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
-
-#     Args:
-#         pretrained (bool): If True, returns a model pre-trained on ImageNet
-#         progress (bool): If True, displays a progress bar of the download to stderr
-#     """
-#     # kwargs = {'num_classes': 257}
-#     return _resnet('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
-#                    **kwargs)
-
-
-# func_dict = {
-#     'resnet50': (resnet50, 2048)
-# }

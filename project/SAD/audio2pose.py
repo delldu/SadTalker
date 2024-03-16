@@ -43,11 +43,13 @@ class Audio2Pose(nn.Module):
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6565
         # tensor [class_id] size: [1], min: 0.0, max: 0.0, mean: 0.0
 
-        image_pose = image_exp_pose[:, 0, -6:]  # [1, 200, 70] ==> [1, 6]
-
         bs = image_exp_pose.shape[0]
-        
-        indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 199, 1, 80, 16], we regard the reference as the first frame
+
+        # image_pose = image_exp_pose[:, 0, -6:]  # [1, 200, 70] ==> [1, 6]
+        image_pose = image_exp_pose[:, 0, 64:]  # [1, 200, 70] ==> [1, 6]
+
+        # we regard the reference as the first frame
+        indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 199, 1, 80, 16], 
         num_frames = audio_mels.shape[1] # 200
         num_frames = int(num_frames) - 1 # ==> 199
 
@@ -59,7 +61,7 @@ class Audio2Pose(nn.Module):
         # xxxx_8888
         for i in range(div):
             z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
-            audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len:(i+1)*self.seq_len,:,:,:]) #bs seq_len 512
+            audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len : (i+1)*self.seq_len, :, :, :])
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             y = self.netG(image_pose, class_id, z, audio_emb) # CVAE(...)
@@ -68,7 +70,7 @@ class Audio2Pose(nn.Module):
         
         if re != 0:
             z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
-            audio_emb = self.audio_encoder(indiv_mels_use[:, -1*self.seq_len:,:,:,:]) #bs seq_len  512
+            audio_emb = self.audio_encoder(indiv_mels_use[:, -1*self.seq_len:, :, :, :])
             if audio_emb.shape[1] != self.seq_len:
                 pad_dim = self.seq_len-audio_emb.shape[1]
                 pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
@@ -77,10 +79,10 @@ class Audio2Pose(nn.Module):
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             y = self.netG(image_pose, class_id, z, audio_emb)  # CVAE(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred_list.append(y[:,-1*re:,:])   
+            pose_pred_list.append(y[:, -1*re:, :])   
         
         audio_pose_pred = torch.cat(pose_pred_list, dim = 1)
-        pose_pred = image_exp_pose[:, :1, -6:] + audio_pose_pred  # [1, 200, 6]
+        pose_pred = image_exp_pose[:, :1, 64:70] + audio_pose_pred  # [1, 200, 6]
         # tensor [pose_pred] size: [1, 200, 6], min: -0.786278, max: 0.285415, mean: -0.106551
 
         return pose_pred # [1, 200, 6]
@@ -92,9 +94,7 @@ class ResidualConv(nn.Module):
         self.conv_block = nn.Sequential(
             nn.BatchNorm2d(input_dim),
             nn.ReLU(),
-            nn.Conv2d(
-                input_dim, output_dim, kernel_size=3, stride=stride, padding=padding
-            ),
+            nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=stride, padding=padding),
             nn.BatchNorm2d(output_dim),
             nn.ReLU(),
             nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
@@ -112,9 +112,7 @@ class Upsample(nn.Module):
     def __init__(self, input_dim, output_dim, kernel, stride):
         super().__init__()
 
-        self.upsample = nn.ConvTranspose2d(
-            input_dim, output_dim, kernel_size=kernel, stride=stride
-        )
+        self.upsample = nn.ConvTranspose2d(input_dim, output_dim, kernel_size=kernel, stride=stride)
 
     def forward(self, x):
         return self.upsample(x)
@@ -157,6 +155,7 @@ class ResUnet(nn.Module):
         x1 = self.input_layer(x) + self.input_skip(x)
         x2 = self.residual_conv_1(x1)
         x3 = self.residual_conv_2(x2)
+
         # Bridge
         x4 = self.bridge(x3)
 
@@ -165,12 +164,9 @@ class ResUnet(nn.Module):
         x5 = torch.cat([x4, x3], dim=1)
 
         x6 = self.up_residual_conv1(x5)
-
         x6 = self.upsample_2(x6)
         x7 = torch.cat([x6, x2], dim=1)
-
         x8 = self.up_residual_conv2(x7)
-
         x8 = self.upsample_3(x8)
         x9 = torch.cat([x8, x1], dim=1)
 
@@ -186,8 +182,8 @@ class Conv2d(nn.Module):
         super().__init__()
         self.conv_block = nn.Sequential(
                             nn.Conv2d(cin, cout, kernel_size, stride, padding),
-                            nn.BatchNorm2d(cout)
-                            )
+                            nn.BatchNorm2d(cout),
+                        )
         self.act = nn.ReLU()
 
     def forward(self, x):
@@ -199,8 +195,8 @@ class Conv2dWithRes(nn.Module):
         super().__init__()
         self.conv_block = nn.Sequential(
                             nn.Conv2d(cin, cout, kernel_size, stride, padding),
-                            nn.BatchNorm2d(cout)
-                            )
+                            nn.BatchNorm2d(cout),
+                        )
         self.act = nn.ReLU()
 
     def forward(self, x):
@@ -234,7 +230,6 @@ class AudioEncoder(nn.Module):
     def forward(self, audio_sequences):
         # tensor [audio_sequences] size: [1, 32, 1, 80, 16], min: -3.269791, max: 2.590095, mean: -0.766574
         B = audio_sequences.size(0)
-        # xxxx_8888
         audio_sequences = torch.cat(
             [audio_sequences[:, i] for i in range(audio_sequences.size(1))], dim=0)
         # size() ==> [32, 1, 80, 16]
@@ -282,7 +277,6 @@ class CVAE(nn.Module):
         audio_emb_in_size = 512 # cfg.MODEL.CVAE.AUDIO_EMB_IN_SIZE
         audio_emb_out_size = 6 # cfg.MODEL.CVAE.AUDIO_EMB_OUT_SIZE
         seq_len = 32 # fg.MODEL.CVAE.SEQ_LEN
-
         self.decoder = Decoder(decoder_layer_sizes, latent_size, num_classes,
                                 audio_emb_in_size, audio_emb_out_size, seq_len)
 
@@ -290,35 +284,47 @@ class CVAE(nn.Module):
         return self.decoder(image_pose, class_id, z, audio_emb)
 
 class Decoder(nn.Module):
-    def __init__(self, layer_sizes, latent_size, num_classes, 
-                audio_emb_in_size, audio_emb_out_size, seq_len):
+    def __init__(self, 
+                 layer_sizes=[128, 192], 
+                 latent_size=64, 
+                 num_classes=46, 
+                 audio_emb_in_size=512, 
+                 audio_emb_out_size=6, 
+                 seq_len=32,
+            ):
         super().__init__()
-
         self.resunet = ResUnet()
         self.seq_len = seq_len
 
         self.MLP = nn.Sequential()
-        input_size = latent_size + seq_len*audio_emb_out_size + 6
+        input_size = latent_size + seq_len*audio_emb_out_size + 6 # ==> 262
         for i, (in_size, out_size) in enumerate(zip([input_size]+layer_sizes[:-1], layer_sizes)):
+            # [262, 128]
             self.MLP.add_module(
                 name="L{:d}".format(i), module=nn.Linear(in_size, out_size))
             if i+1 < len(layer_sizes):
                 self.MLP.add_module(name="A{:d}".format(i), module=nn.ReLU())
             else:
                 self.MLP.add_module(name="sigmoid", module=nn.Sigmoid())
-        
+        # (Pdb) self.MLP
+        # Sequential(
+        #   (L0): Linear(in_features=262, out_features=128, bias=True)
+        #   (A0): ReLU()
+        #   (L1): Linear(in_features=128, out_features=192, bias=True)
+        #   (sigmoid): Sigmoid()
+        # )
         self.pose_linear = nn.Linear(6, 6)
         self.linear_audio = nn.Linear(audio_emb_in_size, audio_emb_out_size)
-        self.classbias = nn.Parameter(torch.randn(num_classes, latent_size)) # num_classes === 46
+        # (Pdb) self.linear_audio -- Linear(in_features=512, out_features=6, bias=True)
+        self.classbias = nn.Parameter(torch.randn(num_classes, latent_size)) # size() -- [46, 64]
 
     def forward(self, image_pose, class_id, z, audio_emb):
         # tensor [image_pose] size: [1, 6], min: -0.660511, max: 0.165923, mean: -0.111156
         # tensor [class] size: [1], min: 0.0, max: 0.0, mean: 0.0
         # tensor [z] size: [1, 64], min: -2.471357, max: 1.718462, mean: -0.13537
         # tensor [audio_emb] size: [1, 32, 512], min: 0.0, max: 8.744249, mean: 0.4157
-
         bs = z.shape[0] # 1
-        audio_out = self.linear_audio(audio_emb) # size() --  [1, 6]
+        audio_out = self.linear_audio(audio_emb) # audio_emb.size() --  [1, 6]
         audio_out = audio_out.reshape([bs, -1]) # size() -- [1, 192]
         class_bias = self.classbias[class_id] # self.classbias.size() -- [46, 64]
 
