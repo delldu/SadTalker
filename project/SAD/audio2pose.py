@@ -46,7 +46,7 @@ class Audio2Pose(nn.Module):
         bs = image_exp_pose.shape[0]
 
         # image_pose = image_exp_pose[:, 0, -6:]  # [1, 200, 70] ==> [1, 6]
-        image_pose = image_exp_pose[:, 0, 64:]  # [1, 200, 70] ==> [1, 6]
+        image_pose = image_exp_pose[:, 0, 64:70]  # [1, 200, 70] ==> [1, 6]
 
         # we regard the reference as the first frame
         indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 199, 1, 80, 16], 
@@ -71,10 +71,14 @@ class Audio2Pose(nn.Module):
         if re != 0:
             z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
             audio_emb = self.audio_encoder(indiv_mels_use[:, -1*self.seq_len:, :, :, :])
-            if audio_emb.shape[1] != self.seq_len:
-                pad_dim = self.seq_len-audio_emb.shape[1]
-                pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
-                audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
+            # xxxx_8888
+            # if audio_emb.shape[1] != self.seq_len:
+            #     pad_dim = self.seq_len-audio_emb.shape[1]
+            #     pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
+            #     audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
+            pad_dim = self.seq_len-audio_emb.shape[1]
+            pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
+            audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
 
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             y = self.netG(image_pose, class_id, z, audio_emb)  # CVAE(...)

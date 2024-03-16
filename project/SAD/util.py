@@ -14,6 +14,9 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.nn.utils import remove_spectral_norm
+import torchvision.transforms as T
+from PIL import ImageDraw
+
 from typing import Tuple
 
 import todos
@@ -75,7 +78,7 @@ def headpose_pred_to_degree(pred):
     idx_tensor = [idx for idx in range(66)]
     idx_tensor = torch.FloatTensor(idx_tensor).type_as(pred).to(pred.device)
     pred = F.softmax(pred, dim=1)
-    degree = torch.sum(pred*idx_tensor, 1) * 3 - 99
+    degree = torch.sum(pred*idx_tensor, 1) * 3.0 - 99.0
     return degree
 
 def get_rotation_matrix(yaw, pitch, roll):
@@ -145,13 +148,13 @@ def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
     # (Pdb) trans
     # tensor([[ 0.0084, -0.0088,  0.2165],
     #         [ 0.0084, -0.0088,  0.2165]], device='cuda:0')
-    trans[:, 0] = trans[:, 0]*0
-    trans[:, 2] = trans[:, 2]*0
+    trans[:, 0] = trans[:, 0]*0.0
+    trans[:, 2] = trans[:, 2]*0.0
     trans = trans.unsqueeze(1).repeat(1, kp.shape[1], 1)
     kp_t = kp_rotated + trans
 
     # Add expression deviation 
-    exp = exp.view(exp.shape[0], -1, 3) # [2, 45] ==> [2, 15, 3]
+    exp = exp.view(exp.shape[0], -1, 3) # [1, 45] ==> [1, 15, 3]
     kp_transformed = kp_t + exp
 
     return kp_transformed
@@ -188,3 +191,23 @@ class UpBlock3d(nn.Module):
         out = self.norm(out)
         out = F.relu(out)
         return out
+
+def draw_keypoint(t, kp):
+    kp = (kp + 1.0)/2.0
+    kp = kp.clamp(0.0, 1.0)
+    kp = kp * 512.0
+
+    image = T.functional.to_pil_image(t[0, :, :, :])
+    draw = ImageDraw.Draw(image)
+
+    for i in range(kp.size(1)):
+        x, y, z = kp[0, i]
+        x = x.item()
+        y = y.item()
+        # box = (x1, y1, x2, y2)
+        box = (int(x) - 2, int(y) - 2, int(x) + 2, int(y) + 2)
+        draw.ellipse(box, fill=None, outline="#FF0000", width=1)
+
+    t[0, :, :, :] = T.functional.to_tensor(image)
+    return t
+

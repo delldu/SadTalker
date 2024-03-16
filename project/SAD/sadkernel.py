@@ -93,16 +93,16 @@ class SADKernel(nn.Module):
         self.decoder = SPADEDecoder()
 
 
-    def deform_input(self, inp, deformation):
-        # tensor [inp] size: [1, 32, 16, 128, 128], min: -102.424561, max: 113.730629, mean: 0.687735
-        _, _, d, h, w = inp.shape
+    def deform_input(self, input, deformation):
+        # tensor [input] size: [1, 32, 16, 128, 128], min: -102.424561, max: 113.730629, mean: 0.687735
+        _, _, d, h, w = input.shape
         deformation = deformation.permute(0, 4, 1, 2, 3)
         deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
         deformation = deformation.permute(0, 2, 3, 4, 1)
  
         # onnx: 5D grid sample
         # tensor [deformation] size: [1, 16, 128, 128, 3], min: -1.025367, max: 1.00552, mean: -0.011624
-        return F.grid_sample(inp, deformation, align_corners=False) # size() -- [1, 32, 16, 128, 128
+        return F.grid_sample(input, deformation, align_corners=False) # size() -- [1, 32, 16, 128, 128
 
     def forward(self, source_image, audio_kp, image_kp):
         # Encoding (downsampling) part
@@ -199,10 +199,10 @@ class SameBlock2d(nn.Module):
 
 # https://zhuanlan.zhihu.com/p/675551997
 class InstanceNorm2dAlt(nn.InstanceNorm2d):
-    def forward(self, inp: torch.Tensor) -> torch.Tensor:
-        self._check_input_dim(inp)
-        desc = 1 / (inp.var(axis=[2, 3], keepdim=True, unbiased=False) + self.eps) ** 0.5
-        retval = (inp - inp.mean(axis=[2, 3], keepdim=True)) * desc
+    def forward(self, input):
+        self._check_input_dim(input)
+        desc = 1.0 / (input.var(dim=[2, 3], keepdim=True, unbiased=False) + self.eps) ** 0.5
+        retval = (input - input.mean(dim=[2, 3], keepdim=True)) * desc
         return retval
 
 

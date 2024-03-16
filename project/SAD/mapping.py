@@ -40,11 +40,11 @@ class MappingNet(nn.Module):
 
         self.layer = layer
         self.first = nn.Sequential(
-            torch.nn.Conv1d(coeff_nc, descriptor_nc, kernel_size=7, padding=0, bias=True))
+            nn.Conv1d(coeff_nc, descriptor_nc, kernel_size=7, padding=0, bias=True))
 
         for i in range(layer):
             net = nn.Sequential(nn.LeakyReLU(0.1),
-                torch.nn.Conv1d(descriptor_nc, descriptor_nc, kernel_size=3, padding=0, dilation=3))
+                nn.Conv1d(descriptor_nc, descriptor_nc, kernel_size=3, padding=0, dilation=3))
             setattr(self, 'encoder' + str(i), net)   
 
         self.pooling = nn.AdaptiveAvgPool1d(1)
@@ -57,7 +57,7 @@ class MappingNet(nn.Module):
 
     def forward(self, canonical_kp, input_3dmm):
         """Audio Encoder --> Mapping ?"""
-        # tensor [input_3dmm] size: [1, 70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
+        # tensor [input_3dmm] size: [70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
 
         out = self.first(input_3dmm.unsqueeze(0))
         # tensor [out] size: [1, 1024, 21], min: -1.797052, max: 0.736073, mean: -0.228992
@@ -66,9 +66,14 @@ class MappingNet(nn.Module):
         # for i in range(self.layer): # self.layer -- 3
         #     model = getattr(self, 'encoder' + str(i))
         #     out = model(out) + out[:,:, 3:-3]
-        out = self.encoder0(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 15]
-        out = self.encoder1(out) + out[:,:, 3:-3]
-        out = self.encoder2(out) + out[:,:, 3:-3]
+        # out = self.encoder0(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 15]
+        # out = self.encoder1(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 9]
+        # out = self.encoder2(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 3]
+
+        out = self.encoder0(out) + out[:,:, 3:18] # out[:,:, 3:-3].size() -- [1, 1024, 15]
+        out = self.encoder1(out) + out[:,:, 3:12] # out[:,:, 3:-3].size() -- [1, 1024, 9]
+        out = self.encoder2(out) + out[:,:, 3:6] # out[:,:, 3:-3].size() -- [1, 1024, 3]
+        # out.size() -- [1, 1024, 3]
 
         out = self.pooling(out)
         out = out.view(out.shape[0], -1)
@@ -85,5 +90,4 @@ class MappingNet(nn.Module):
         # tensor [trans] size: [1, 3], min: -0.058004, max: 0.227935, mean: 0.068895
         # tensor [exp] size: [1, 45], min: -0.102243, max: 0.015078, mean: -0.002095
 
-        # return (yaw, pitch, roll, trans, exp) # output
         return keypoint_transform(canonical_kp, yaw, pitch, roll, trans, exp)

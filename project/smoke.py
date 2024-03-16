@@ -70,17 +70,17 @@ def run_bench_mark():
     print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
     os.system("nvidia-smi | grep python")
 
-
-def export_drive_face_keypoint_onnx_model():
+def export_image_3d_pose_exp_onnx_model():
     import onnx
     import onnxruntime
     from onnxsim import simplify
     import onnxoptimizer
 
-    print("Export drive_face_keypoint onnx model ...")
+    print("Export image_3d_pose_exp onnx model ...")
 
     # 1. Run torch model
     model, device = SAD.get_model()
+    model = model.image2coffe_model
 
     B, C, H, W = 1, 3, 512, 512
     dummy_input = torch.randn(B, C, H, W).to(device)
@@ -92,7 +92,7 @@ def export_drive_face_keypoint_onnx_model():
     # 2. Export onnx model
     input_names = [ "input" ]
     output_names = [ "output" ]
-    onnx_filename = "output/drive_face_keypoint.onnx"
+    onnx_filename = "output/image_3d_pose_exp.onnx"
 
     torch.onnx.export(model, 
         (dummy_input),
@@ -100,7 +100,85 @@ def export_drive_face_keypoint_onnx_model():
         verbose=False, 
         input_names=input_names, 
         output_names=output_names,
-        opset_version=20,
+        opset_version=16,
+    )
+
+    # 3. Check onnx model file
+    onnx_model = onnx.load(onnx_filename)
+    onnx.checker.check_model(onnx_model)
+
+    onnx_model, check = simplify(onnx_model)
+    assert check, "Simplified ONNX model could not be validated"
+    onnx_model = onnxoptimizer.optimize(onnx_model)
+    onnx.save(onnx_model, onnx_filename)
+    # print(onnx.helper.printable_graph(onnx_model.graph))
+
+    # 4. Run onnx model
+    if 'cuda' in device.type:
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CUDAExecutionProvider'])
+    else:        
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CPUExecutionProvider'])
+
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+    onnx_inputs = { input_names[0]: to_numpy(dummy_input), 
+                }
+    onnx_outputs = ort_session.run(None, onnx_inputs)
+
+    # 5.Compare output results
+    assert len(torch_outputs) == len(onnx_outputs)
+    for torch_output, onnx_output in zip(torch_outputs, onnx_outputs):
+        torch.testing.assert_close(torch_output, torch.tensor(onnx_output), rtol=0.01, atol=0.01)
+
+    todos.model.reset_device()
+
+    print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
+
+def export_audio_3d_pose_exp_onnx_model():
+    import onnx
+    import onnxruntime
+    from onnxsim import simplify
+    import onnxoptimizer
+
+    print("Export audio_3d_pose_exp onnx model ...")
+
+    # 1. Run torch model
+    model, device = SAD.get_model()
+    model = model.audio2coffe_model
+
+    audio_mels_input = torch.randn(1, 20, 1, 80, 16).to(device)
+    audio_ratio_input = torch.randn(1, 20, 1).to(device)
+    image_exp_pose = torch.randn(1, 20, 70).to(device)
+    # input ---- audio_mels, audio_ratio, image_exp_pose
+    #   tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+    #   tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
+    #   tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
+    # output ---- tensor [audio_exp_pose] size: [200, 70], min: -1.703708, max: 1.255959, mean: -0.02074
+
+    with torch.no_grad():
+        dummy_output = model(audio_mels_input, audio_ratio_input, image_exp_pose)
+    torch_outputs = [dummy_output.cpu()]
+
+    # 2. Export onnx model
+    input_names = [ "audio_mels", "audio_ratio", "image_exp_pose"]
+    output_names = [ "output" ]
+    onnx_filename = "output/audio_3d_pose_exp.onnx"
+    dynamic_axes = { 
+        'audio_mels' : {1: 'nframes'}, 
+        'audio_ratio' : {1: 'nframes'}, 
+        'image_exp_pose' : {1: 'nframes'}, 
+        'output' : {0: 'nframes'} 
+    }  
+
+    torch.onnx.export(model, 
+        (audio_mels_input, audio_ratio_input, image_exp_pose),
+        onnx_filename, 
+        verbose=False, 
+        input_names=input_names, 
+        output_names=output_names,
+        dynamic_axes=dynamic_axes,
+        opset_version=16,
     )
 
     # 3. Check onnx model file
@@ -109,8 +187,77 @@ def export_drive_face_keypoint_onnx_model():
 
     # onnx_model, check = simplify(onnx_model)
     # assert check, "Simplified ONNX model could not be validated"
-    # onnx_model = onnxoptimizer.optimize(onnx_model)
-    # onnx.save(onnx_model, onnx_filename)
+    onnx_model = onnxoptimizer.optimize(onnx_model)
+    onnx.save(onnx_model, onnx_filename)
+    # print(onnx.helper.printable_graph(onnx_model.graph))
+
+    # 4. Run onnx model
+    if 'cuda' in device.type:
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CUDAExecutionProvider'])
+    else:        
+        ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CPUExecutionProvider'])
+
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+
+    # audio_mels_input, audio_ratio_input
+    onnx_inputs = { input_names[0]: to_numpy(audio_mels_input), 
+                    input_names[1]: to_numpy(audio_ratio_input),
+                    input_names[2]: to_numpy(image_exp_pose),
+                }
+    onnx_outputs = ort_session.run(None, onnx_inputs)
+
+    # 5.Compare output results
+    assert len(torch_outputs) == len(onnx_outputs)
+    for torch_output, onnx_output in zip(torch_outputs, onnx_outputs):
+        torch.testing.assert_close(torch_output, torch.tensor(onnx_output), rtol=0.01, atol=0.01)
+
+    todos.model.reset_device()
+
+    print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
+
+
+def export_image_3d_keypoint_onnx_model():
+    import onnx
+    import onnxruntime
+    from onnxsim import simplify
+    import onnxoptimizer
+
+    print("Export image_3d_keypoint onnx model ...")
+
+    # 1. Run torch model
+    model, device = SAD.get_model()
+    model = model.kpdetector_model
+
+    B, C, H, W = 1, 3, 512, 512
+    dummy_input = torch.randn(B, C, H, W).to(device)
+
+    with torch.no_grad():
+        dummy_output = model(dummy_input)
+    torch_outputs = [dummy_output.cpu()]
+
+    # 2. Export onnx model
+    input_names = [ "input" ]
+    output_names = [ "output" ]
+    onnx_filename = "output/image_3d_keypoint.onnx"
+
+    torch.onnx.export(model, 
+        (dummy_input),
+        onnx_filename, 
+        verbose=False, 
+        input_names=input_names, 
+        output_names=output_names,
+        opset_version=16,
+    )
+
+    # 3. Check onnx model file
+    onnx_model = onnx.load(onnx_filename)
+    onnx.checker.check_model(onnx_model)
+
+    onnx_model, check = simplify(onnx_model)
+    assert check, "Simplified ONNX model could not be validated"
+    onnx_model = onnxoptimizer.optimize(onnx_model)
+    onnx.save(onnx_model, onnx_filename)
     # print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
@@ -136,13 +283,13 @@ def export_drive_face_keypoint_onnx_model():
     print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
 
 
-def export_audo_face_generator_onnx_model():
+def export_audio_face_render_onnx_model():
     import onnx
     import onnxruntime
     from onnxsim import simplify
     import onnxoptimizer
 
-    print("Export drive_face_generator onnx model ...")
+    print("Export audio_face_render onnx model ...")
 
     # 1. Run torch model
     model, device = SAD.get_model()
@@ -160,9 +307,9 @@ def export_audo_face_generator_onnx_model():
     torch_outputs = [dummy_output.cpu()]
 
     # 2. Export onnx model
-    input_names = [ "image", "audio_ko", "image_kp" ]
+    input_names = [ "image", "audio_kp", "image_kp" ]
     output_names = [ "output" ]
-    onnx_filename = "output/audio_face_generator.onnx"
+    onnx_filename = "output/audio_face_render.onnx"
 
     torch.onnx.export(model, 
         (image, audio_kp, image_kp),
@@ -208,34 +355,36 @@ def export_audo_face_generator_onnx_model():
     print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
 
 
-def export_sad_onnx_model():
+def export_3dmm_keypoint_map_onnx_model():
     import onnx
     import onnxruntime
     from onnxsim import simplify
     import onnxoptimizer
 
-    print("Export drive_face_generator onnx model ...")
+    print("Export 3dmm_keypoint_map onnx model ...")
 
     # 1. Run torch model
     model, device = SAD.get_model()
+    model = model.mappingnet_model
 
-    B, C, H, W = 1, 3, 512, 512
-    audio = torch.randn(20, 640).to(device) # offset_kp
-    image = torch.randn(B, C, H, W).to(device) # source_kp
-
-    # audio, image
+    input_kp = torch.randn(1, 15, 3).to(device) # offset_kp
+    input_3dmm = torch.randn(70, 27).to(device) # source_kp
+    # input ---- input_kp, input_3dmm
+    # tensor [input_kp] size: [1, 15, 3], min: -0.891859, max: 0.950069, mean: 0.015366
+    # tensor [input_3dmm] size: [70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
+    # output ---- [fine_kp] size: [1, 15, 3]
     with torch.no_grad():
-        dummy_output = model(audio, image)
+        dummy_output = model(input_kp, input_3dmm)
 
     torch_outputs = [dummy_output.cpu()]
 
     # 2. Export onnx model
-    input_names = [ "audio", "image"]
+    input_names = [ "input_kp", "input_3dmm"]
     output_names = [ "output" ]
-    onnx_filename = "output/audio_drive.onnx"
+    onnx_filename = "output/3dmm_keypoint_map.onnx"
 
     torch.onnx.export(model, 
-        (audio, image),
+        (input_kp, input_3dmm),
         onnx_filename, 
         verbose=False, 
         input_names=input_names, 
@@ -246,9 +395,8 @@ def export_sad_onnx_model():
     # 3. Check onnx model file
     onnx_model = onnx.load(onnx_filename)
     onnx.checker.check_model(onnx_model)
-
-    onnx_model, check = simplify(onnx_model)
-    assert check, "Simplified ONNX model could not be validated"
+    # onnx_model, check = simplify(onnx_model)
+    # assert check, "Simplified ONNX model could not be validated"
     onnx_model = onnxoptimizer.optimize(onnx_model)
     onnx.save(onnx_model, onnx_filename)
     # print(onnx.helper.printable_graph(onnx_model.graph))
@@ -262,8 +410,8 @@ def export_sad_onnx_model():
     def to_numpy(tensor):
         return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
 
-    onnx_inputs = { input_names[0]: to_numpy(audio), 
-                    input_names[1]: to_numpy(image),
+    onnx_inputs = { input_names[0]: to_numpy(input_kp), 
+                    input_names[1]: to_numpy(input_3dmm),
                 }
     onnx_outputs = ort_session.run(None, onnx_inputs)
 
@@ -275,7 +423,6 @@ def export_sad_onnx_model():
     todos.model.reset_device()
 
     print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
-
 
 
 if __name__ == "__main__":
@@ -290,9 +437,12 @@ if __name__ == "__main__":
     if args.bench_mark:
         run_bench_mark()
     if args.export_onnx:
-        # export_drive_face_keypoint_onnx_model()
-        # export_audo_face_generator_onnx_model()
-        export_sad_onnx_model()
+        # Trace mode and CPU seems OK
+        # export_image_3d_pose_exp_onnx_model()
+        # export_image_3d_keypoint_onnx_model()
+        export_audio_face_render_onnx_model() # ???
+        # export_3dmm_keypoint_map_onnx_model()
+        # export_audio_3d_pose_exp_onnx_model() # ???
     
     if not (args.shape_test or args.bench_mark or args.export_onnx):
         parser.print_help()

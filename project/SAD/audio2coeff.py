@@ -24,11 +24,11 @@ class Audio2Coeff(nn.Module):
         self.audio2exp_model = Audio2Exp()
         self.audio2pose_model = Audio2Pose()
 
-    def forward(self, audio_mels, image_exp_pose, audio_ratio, pose_style:int=0):
+    def forward(self, audio_mels, audio_ratio, image_exp_pose):
+        pose_style:int = 0 # xxxx_8888
         # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
-        # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
-        # [pose_style] value: '0'
+        # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
 
         with torch.no_grad():
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -48,4 +48,4 @@ class Audio2Coeff(nn.Module):
             coeffs_pred = torch.cat((exp_pred, pose_pred), dim=2)
             # tensor [coeffs_pred] size: [1, 200, 70], min: -1.690973, max: 1.272287, mean: -0.021126
 
-            return coeffs_pred # coeffs_pred.size() -- [1, 200, 70]
+            return coeffs_pred.squeeze(0) # coeffs_pred.size() -- [200, 70]
