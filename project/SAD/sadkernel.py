@@ -105,6 +105,9 @@ class SADKernel(nn.Module):
         return F.grid_sample(input, deformation, align_corners=False) # size() -- [1, 32, 16, 128, 128
 
     def forward(self, source_image, audio_kp, image_kp):
+        # torch.save(source_image, "output/image.tensor")
+        # torch.save(audio_kp, "output/audio_kp.tensor")
+        # torch.save(image_kp, "output/image_kp.tensor")
         # Encoding (downsampling) part
         out = self.first(source_image)
         for i, m in enumerate(self.down_blocks):
@@ -185,7 +188,7 @@ class SameBlock2d(nn.Module):
         super().__init__()
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features,
                               kernel_size=kernel_size, padding=padding, groups=groups)
-        self.norm = nn.BatchNorm2d(out_features, affine=True)
+        self.norm = nn.BatchNorm2d(out_features)
         if lrelu:
             self.ac = nn.LeakyReLU()
         else:
@@ -218,12 +221,17 @@ class SPADE(nn.Module):
         self.mlp_beta = nn.Conv2d(nhidden, norm_nc, kernel_size=3, padding=1)
 
     def forward(self, x, segmap):
+        B, C, H, W = x.size()
+        # tensor [x] size: [1, 512, 128, 128], min: -27.941725, max: 33.3881, mean: 0.048537
+        # tensor [segmap] size: [1, 256, 128, 128], min: -5.268071, max: 2.414279, mean: -0.027965
         normalized = self.param_free_norm(x)
-        segmap = F.interpolate(segmap, size=x.size()[2:], mode='nearest')
+        # tensor [normalized] size: [1, 512, 128, 128], min: -9.711704, max: 9.979113, mean: 0.0
+
+        segmap = F.interpolate(segmap, size=(H, W), mode='nearest')
         actv = self.mlp_shared(segmap)
         gamma = self.mlp_gamma(actv)
         beta = self.mlp_beta(actv)
-        out = normalized * (1 + gamma) + beta
+        out = normalized * (1.0 + gamma) + beta
         return out
     
 
@@ -311,8 +319,8 @@ class ResBlock3d(nn.Module):
                         kernel_size=kernel_size, padding=padding)
         self.conv2 = nn.Conv3d(in_channels=in_features, out_channels=in_features, 
                         kernel_size=kernel_size, padding=padding)
-        self.norm1 = nn.BatchNorm3d(in_features, affine=True)
-        self.norm2 = nn.BatchNorm3d(in_features, affine=True)
+        self.norm1 = nn.BatchNorm3d(in_features) # onnx ???
+        self.norm2 = nn.BatchNorm3d(in_features)
 
     def forward(self, x):
         out = self.norm1(x)

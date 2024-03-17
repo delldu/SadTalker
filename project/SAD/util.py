@@ -132,7 +132,7 @@ def get_rotation_matrix(yaw, pitch, roll):
     #          [ 0.0012, -0.1170,  0.9931]], device='cuda:0'
     return rot_mat # size() -- [1, 3, 3]
 
-def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
+def keypoint_transform(kp, yaw, pitch, roll, trans, express):
     # kp -- [2, 15, 3]
     # yaw.size() --[2, 66]
 
@@ -154,8 +154,8 @@ def keypoint_transform(kp, yaw, pitch, roll, trans, exp):
     kp_t = kp_rotated + trans
 
     # Add expression deviation 
-    exp = exp.view(exp.shape[0], -1, 3) # [1, 45] ==> [1, 15, 3]
-    kp_transformed = kp_t + exp
+    express = express.view(express.shape[0], -1, 3) # [1, 45] ==> [1, 15, 3]
+    kp_transformed = kp_t + express
 
     return kp_transformed
 
@@ -167,8 +167,8 @@ class DownBlock2d(nn.Module):
         super().__init__()
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, 
                         kernel_size=kernel_size, padding=padding, groups=groups)
-        self.norm = nn.BatchNorm2d(out_features, affine=True)
-        self.pool = nn.AvgPool2d(kernel_size=(2, 2))
+        self.norm = nn.BatchNorm2d(out_features) # onnx ???
+        self.pool = nn.AvgPool2d(kernel_size=(2, 2)) # onnx ???
 
     def forward(self, x):
         out = self.conv(x)
@@ -183,7 +183,7 @@ class UpBlock3d(nn.Module):
         super().__init__()
         self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, 
                         kernel_size=kernel_size, padding=padding, groups=groups)
-        self.norm = nn.BatchNorm3d(out_features, affine=True)
+        self.norm = nn.BatchNorm3d(out_features)
 
     def forward(self, x):
         out = F.interpolate(x, scale_factor=(1.0, 2.0, 2.0))

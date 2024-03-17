@@ -18,10 +18,11 @@ from tqdm import tqdm
 from PIL import Image
 
 import torch
-import todos
+import torch.nn as nn
 import torchaudio
 from torchvision.transforms import Compose, ToTensor
 from SAD.sad import SADModel
+
 import todos
 import pdb
 
@@ -65,7 +66,7 @@ def video_merge(input_video_file, input_audio_file, output_file):
     return runcmd(cmd)
 
 
-def create_model():
+def get_trace_model():
     """
     Create model
     """
@@ -76,13 +77,23 @@ def create_model():
     model.eval()
     print(f"Running model on {device} ...")
 
+    # for n, m in model.named_modules():
+    #     if isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d):
+    #         # pdb.set_trace()
+    #         # m.train()
+    #         # m.train(False)
+    #         # print(n, m.__class__.__name__)
+    #         m.track_running_stats = False
+    #         # print(m.state_dict())
+    # # pdb.set_trace()
+
     return model, device
 
 
-def get_model():
+def get_script_model():
     """Load jit script model."""
 
-    model, device = create_model()
+    model, device = get_trace_model()
 
     # https://github.com/pytorch/pytorch/issues/52286
     torch._C._jit_set_profiling_executor(False)
@@ -125,7 +136,7 @@ def predict(audio_file, image_file, output_dir):
     todos.data.mkdir(output_dir)
 
     # load model
-    model, device = get_model()
+    model, device = get_script_model()
 
     # load audio
     audio = load_wav(audio_file)

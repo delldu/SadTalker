@@ -10,6 +10,7 @@
 #
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from SAD.util import keypoint_transform
 
 # from typing import Tuple
@@ -38,7 +39,7 @@ class MappingNet(nn.Module):
     ):
         super().__init__()
 
-        self.layer = layer
+        # self.layer = layer
         self.first = nn.Sequential(
             nn.Conv1d(coeff_nc, descriptor_nc, kernel_size=7, padding=0, bias=True))
 
@@ -57,7 +58,6 @@ class MappingNet(nn.Module):
 
     def forward(self, canonical_kp, input_3dmm):
         # tensor [input_3dmm] size: [70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
-
         out = self.first(input_3dmm.unsqueeze(0))
         # tensor [out] size: [1, 1024, 21], min: -1.797052, max: 0.736073, mean: -0.228992
 
@@ -65,17 +65,19 @@ class MappingNet(nn.Module):
         # for i in range(self.layer): # self.layer -- 3
         #     model = getattr(self, 'encoder' + str(i))
         #     out = model(out) + out[:,:, 3:-3]
-        # out = self.encoder0(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 15]
-        # out = self.encoder1(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 9]
-        # out = self.encoder2(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 3]
+        out = self.encoder0(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 15]
+        out = self.encoder1(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 9]
+        out = self.encoder2(out) + out[:,:, 3:-3] # out[:,:, 3:-3].size() -- [1, 1024, 3]
+        # out = self.encoder0(out) + out[:,:, 3:18] # out[:,:, 3:-3].size() -- [1, 1024, 15]
+        # out = self.encoder1(out) + out[:,:, 3:12] # out[:,:, 3:-3].size() -- [1, 1024, 9]
+        # out = self.encoder2(out) + out[:,:, 3:6] # out[:,:, 3:-3].size() -- [1, 1024, 3]
+        # # out.size() -- [1, 1024, 3]
 
-        out = self.encoder0(out) + out[:,:, 3:18] # out[:,:, 3:-3].size() -- [1, 1024, 15]
-        out = self.encoder1(out) + out[:,:, 3:12] # out[:,:, 3:-3].size() -- [1, 1024, 9]
-        out = self.encoder2(out) + out[:,:, 3:6] # out[:,:, 3:-3].size() -- [1, 1024, 3]
-        # out.size() -- [1, 1024, 3]
-
-        out = self.pooling(out)
-        out = out.view(out.shape[0], -1)
+        ##########################################################################################
+        # Bug: following code will crash on CUDA, but OK on CPU, we use mean instead of it !!! 
+        # out = self.pooling(out) # [1, 1024, 3] ==> [1, 1024, 1]
+        ##########################################################################################
+        out = out.mean(dim=2).view(out.shape[0], -1)
 
         yaw = self.fc_yaw(out)
         pitch = self.fc_pitch(out)

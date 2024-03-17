@@ -31,9 +31,6 @@ class Audio2Pose(nn.Module):
         self.seq_len = 32
         self.latent_dim = 64
         self.audio_encoder = AudioEncoder()
-        self.audio_encoder.eval()
-        for param in self.audio_encoder.parameters():
-            param.requires_grad = False
 
         self.netG = CVAE()
 
@@ -43,53 +40,69 @@ class Audio2Pose(nn.Module):
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6565
         # tensor [class_id] size: [1], min: 0.0, max: 0.0, mean: 0.0
 
+        B, C, D, H, W = audio_mels.size()
+        pad = self.seq_len - (C % self.seq_len) + 1 # 25
+        audio_mels_pad = torch.zeros(B, C + pad, D, H, W).to(audio_mels.device)
+        audio_mels_pad[:, 0:C, :, :, :] = audio_mels
+        # audio_mels_pad.size() -- [1, 225, 1, 80, 16]
+
         bs = image_exp_pose.shape[0]
 
         # image_pose = image_exp_pose[:, 0, -6:]  # [1, 200, 70] ==> [1, 6]
         image_pose = image_exp_pose[:, 0, 64:70]  # [1, 200, 70] ==> [1, 6]
 
         # we regard the reference as the first frame
-        indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 199, 1, 80, 16], 
-        num_frames = audio_mels.shape[1] # 200
-        num_frames = int(num_frames) - 1 # ==> 199
+        indiv_mels_use = audio_mels_pad[:, 1:] # audio_mels[:, 1:] # size() -- [1, 224, 1, 80, 16], 
+        # num_frames = audio_mels.shape[1] # 200
+        # num_frames = int(num_frames) - 1 # ==> 199
+        num_frames = C + pad -1 # int(num_frames) - 1 # ==> 224
 
-        div = num_frames // self.seq_len
-        re = num_frames % self.seq_len
+        div = num_frames // self.seq_len # ==> 7
+        # re = num_frames % self.seq_len # ==> 7
+
         pose_pred_list: List[torch.Tensor] = [torch.zeros(image_pose.unsqueeze(1).shape, 
                                 dtype=image_pose.dtype, 
-                                device=image_pose.device)]
+                                device=image_pose.device)] # size() -- [1, 1, 6]
         for i in range(div):
-            z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
+            # Fix Bug: z randn make result is variable for onnx test, so we limit it with 0.1            
+            # z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # size() [1, 64]
+            z = 0.1 * torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # size() [1, 64]
+
+            # indiv_mels_use -- [1, 224, 1, 80, 16]
             audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len : (i+1)*self.seq_len, :, :, :])
+            # audio_emb.size() -- [1, 32, 512]
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            y = self.netG(image_pose, class_id, z, audio_emb) # CVAE(...), size() -- [1, 32, 6]
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            pose_pred_list.append(y)
+        # pose_pred_list is list: len = 7
+        #     tensor [item] size: [1, 1, 6], min: 0.0, max: 0.0, mean: 0.0
+        #     tensor [item] size: [1, 32, 6], min: -0.10267, max: 0.066458, mean: -0.006753
+        #     tensor [item] size: [1, 32, 6], min: -0.092499, max: 0.178642, mean: -0.004705
+        #     tensor [item] size: [1, 32, 6], min: -0.319835, max: 0.152774, mean: 0.009976
+        #     tensor [item] size: [1, 32, 6], min: -0.059921, max: 0.110091, mean: -0.000214
+        #     tensor [item] size: [1, 32, 6], min: -0.101808, max: 0.073021, mean: -0.005576
+        #     tensor [item] size: [1, 32, 6], min: -0.038888, max: 0.255433, mean: 0.032795
+        # if re != 0:
+        #     z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # [1, 64]
+        #     audio_emb = self.audio_encoder(indiv_mels_use[:, -self.seq_len:, :, :, :])
+        #     # audio_emb.size() -- [1, 32, 512]
+        #     if audio_emb.shape[1] != self.seq_len:
+        #         pad_dim = self.seq_len - audio_emb.shape[1]
+        #         pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
+        #         audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            y = self.netG(image_pose, class_id, z, audio_emb) # CVAE(...)
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred_list.append(y)  #list of bs seq_len 6
-
-        # xxxx_8888
-        if re != 0:
-            z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
-            audio_emb = self.audio_encoder(indiv_mels_use[:, -1*self.seq_len:, :, :, :])
-            # xxxx_8888
-            # if audio_emb.shape[1] != self.seq_len:
-            #     pad_dim = self.seq_len-audio_emb.shape[1]
-            #     pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
-            #     audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
-            pad_dim = self.seq_len-audio_emb.shape[1]
-            pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
-            audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
-
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            y = self.netG(image_pose, class_id, z, audio_emb)  # CVAE(...)
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred_list.append(y[:, -1*re:, :])   
+        #     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #     y = self.netG(image_pose, class_id, z, audio_emb)  # CVAE(...), size() -- [1, 32, 6]
+        #     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #     pose_pred_list.append(y[:, -re:, :])   
         
-        audio_pose_pred = torch.cat(pose_pred_list, dim = 1)
+        audio_pose_pred = torch.cat(pose_pred_list, dim = 1) # size() -- [1, 200, 6]
+        # image_exp_pose[:, :1, 64:70].size() -- [1, 1, 6]
         pose_pred = image_exp_pose[:, :1, 64:70] + audio_pose_pred  # [1, 200, 6]
         # tensor [pose_pred] size: [1, 200, 6], min: -0.786278, max: 0.285415, mean: -0.106551
 
-        return pose_pred # [1, 200, 6]
+        return pose_pred[:, 0:C, :] # [1, 200, 6]
 
 class ResidualConv(nn.Module):
     def __init__(self, input_dim, output_dim, stride, padding):
@@ -234,19 +247,14 @@ class AudioEncoder(nn.Module):
 
     def forward(self, audio_sequences):
         # tensor [audio_sequences] size: [1, 32, 1, 80, 16], min: -3.269791, max: 2.590095, mean: -0.766574
-        B = audio_sequences.size(0)
-        audio_sequences = torch.cat(
-            [audio_sequences[:, i] for i in range(audio_sequences.size(1))], dim=0)
+        B, C, D, H, W = audio_sequences.size()
+        audio_sequences = audio_sequences.reshape(B*C, D, H, W)
         # size() ==> [32, 1, 80, 16]
 
         audio_embedding = self.audio_encoder(audio_sequences)
         dim = audio_embedding.shape[1]
-        audio_embedding = audio_embedding.reshape((B, -1, dim, 1, 1))
-        # tensor [audio_embedding] size: [1, 32, 512, 1, 1], min: 0.0, max: 8.744249, mean: 0.4157
-
-        output = audio_embedding.squeeze(-1).squeeze(-1)
+        output = audio_embedding.reshape((B, -1, dim))
         # tensor [output] size: [1, 32, 512], min: 0.0, max: 8.744249, mean: 0.4157
-
         return output
 
 
@@ -311,7 +319,7 @@ class Decoder(nn.Module):
                 self.MLP.add_module(name="A{:d}".format(i), module=nn.ReLU())
             else:
                 self.MLP.add_module(name="sigmoid", module=nn.Sigmoid())
-        # (Pdb) self.MLP
+        # self.MLP ---- 
         # Sequential(
         #   (L0): Linear(in_features=262, out_features=128, bias=True)
         #   (A0): ReLU()
@@ -320,12 +328,12 @@ class Decoder(nn.Module):
         # )
         self.pose_linear = nn.Linear(6, 6)
         self.linear_audio = nn.Linear(audio_emb_in_size, audio_emb_out_size)
-        # (Pdb) self.linear_audio -- Linear(in_features=512, out_features=6, bias=True)
+        # self.linear_audio -- Linear(in_features=512, out_features=6, bias=True)
         self.classbias = nn.Parameter(torch.randn(num_classes, latent_size)) # size() -- [46, 64]
 
     def forward(self, image_pose, class_id, z, audio_emb):
         # tensor [image_pose] size: [1, 6], min: -0.660511, max: 0.165923, mean: -0.111156
-        # tensor [class] size: [1], min: 0.0, max: 0.0, mean: 0.0
+        # tensor [class_id] size: [1], min: 0.0, max: 0.0, mean: 0.0
         # tensor [z] size: [1, 64], min: -2.471357, max: 1.718462, mean: -0.13537
         # tensor [audio_emb] size: [1, 32, 512], min: 0.0, max: 8.744249, mean: 0.4157
         bs = z.shape[0] # 1

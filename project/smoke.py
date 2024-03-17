@@ -23,7 +23,7 @@ def test_input_shape():
 
     print("Test input shape ...")
 
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
 
     N = 100
     B, C, H, W = 1, 3, 256, 256
@@ -52,7 +52,7 @@ def test_input_shape():
 def run_bench_mark():
     print("Run benchmark ...")
 
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
     N = 100
     B, C, H, W = 1, 3, 256, 256
 
@@ -79,7 +79,7 @@ def export_image_3d_exp_pose_onnx_model():
     print("Export image_3d_exp_pose onnx model ...")
 
     # 1. Run torch model
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
     model = model.image2coffe_model
 
     B, C, H, W = 1, 3, 512, 512
@@ -144,12 +144,12 @@ def export_audio_3d_exp_pose_onnx_model():
     print("Export audio_3d_exp_pose onnx model ...")
 
     # 1. Run torch model
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
     model = model.audio2coffe_model
 
-    audio_mels_input = torch.randn(1, 32, 1, 80, 16).to(device)
-    audio_ratio_input = torch.randn(1, 32, 1).to(device)
-    image_exp_pose = torch.randn(1, 32, 70).to(device)
+    audio_mels_input = torch.randn(1, 40, 1, 80, 16).to(device)
+    audio_ratio_input = torch.randn(1, 40, 1).to(device)
+    image_exp_pose = torch.randn(1, 40, 70).to(device)
     # input ---- audio_mels, audio_ratio, image_exp_pose
     #   tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
     #   tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
@@ -174,7 +174,7 @@ def export_audio_3d_exp_pose_onnx_model():
     torch.onnx.export(model, 
         (audio_mels_input, audio_ratio_input, image_exp_pose),
         onnx_filename, 
-        verbose=False, 
+        verbose=True, 
         input_names=input_names, 
         output_names=output_names,
         dynamic_axes=dynamic_axes,
@@ -187,7 +187,8 @@ def export_audio_3d_exp_pose_onnx_model():
 
     # onnx_model, check = simplify(onnx_model)
     # assert check, "Simplified ONNX model could not be validated"
-    onnx_model = onnxoptimizer.optimize(onnx_model)
+    passes = ["extract_constant_to_initializer", "eliminate_unused_initializer"]    
+    onnx_model = onnxoptimizer.optimize(onnx_model, passes)
     onnx.save(onnx_model, onnx_filename)
     # print(onnx.helper.printable_graph(onnx_model.graph))
 
@@ -226,7 +227,7 @@ def export_image_3d_keypoint_onnx_model():
     print("Export image_3d_keypoint onnx model ...")
 
     # 1. Run torch model
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
     model = model.kpdetector_model
 
     B, C, H, W = 1, 3, 512, 512
@@ -292,13 +293,16 @@ def export_audio_face_render_onnx_model():
     print("Export audio_face_render onnx model ...")
 
     # 1. Run torch model
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
     model = model.sadkernel_model
 
     B, C, H, W = 1, 3, 512, 512
     image = torch.randn(B, C, H, W).to(device) # source_kp
     audio_kp = torch.randn(B, 15, 3).to(device) # offset_kp
     image_kp = torch.randn(B, 15, 3).to(device) # source_image
+    # image = torch.load("output/image.tensor").to(device)
+    # audio_kp = torch.load("output/audio_kp.tensor").to(device)
+    # image_kp = torch.load("output/image_kp.tensor").to(device)
 
     # image, audio_kp=audio_kp, image_kp=image_kp
     with torch.no_grad():
@@ -323,12 +327,11 @@ def export_audio_face_render_onnx_model():
     # 3. Check onnx model file
     onnx_model = onnx.load(onnx_filename)
     onnx.checker.check_model(onnx_model)
-
     onnx_model, check = simplify(onnx_model)
     assert check, "Simplified ONNX model could not be validated"
     onnx_model = onnxoptimizer.optimize(onnx_model)
     onnx.save(onnx_model, onnx_filename)
-    # print(onnx.helper.printable_graph(onnx_model.graph))
+    print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
     if 'cuda' in device.type:
@@ -364,11 +367,15 @@ def export_3dmm_keypoint_map_onnx_model():
     print("Export 3dmm_keypoint_map onnx model ...")
 
     # 1. Run torch model
-    model, device = SAD.get_model()
+    model, device = SAD.get_script_model()
     model = model.mappingnet_model
 
-    input_kp = torch.randn(1, 15, 3).to(device) # offset_kp
-    input_3dmm = torch.randn(70, 27).to(device) # source_kp
+    input_kp = torch.randn(1, 15, 3).to(device)
+    input_3dmm = torch.randn(70, 27).to(device)
+
+    input_kp = torch.load("/tmp/input_kp.tensor").to(device)
+    input_3dmm = torch.load("/tmp/input_3dmm.tensor").to(device)
+
     # input ---- input_kp, input_3dmm
     # tensor [input_kp] size: [1, 15, 3], min: -0.891859, max: 0.950069, mean: 0.015366
     # tensor [input_3dmm] size: [70, 27] , min: tensor(-1.1567, device='cuda:0') , max: tensor(1.4598, device='cuda:0')
@@ -386,7 +393,7 @@ def export_3dmm_keypoint_map_onnx_model():
     torch.onnx.export(model, 
         (input_kp, input_3dmm),
         onnx_filename, 
-        verbose=False, 
+        verbose=True, 
         input_names=input_names, 
         output_names=output_names,
         opset_version=16,
@@ -399,7 +406,7 @@ def export_3dmm_keypoint_map_onnx_model():
     # assert check, "Simplified ONNX model could not be validated"
     onnx_model = onnxoptimizer.optimize(onnx_model)
     onnx.save(onnx_model, onnx_filename)
-    # print(onnx.helper.printable_graph(onnx_model.graph))
+    print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
     if 'cuda' in device.type:
@@ -413,6 +420,7 @@ def export_3dmm_keypoint_map_onnx_model():
     onnx_inputs = { input_names[0]: to_numpy(input_kp), 
                     input_names[1]: to_numpy(input_3dmm),
                 }
+
     onnx_outputs = ort_session.run(None, onnx_inputs)
 
     # 5.Compare output results
@@ -442,9 +450,9 @@ if __name__ == "__main__":
 
         export_audio_3d_exp_pose_onnx_model() # ???
 
-        # export_image_3d_keypoint_onnx_model()
+        # export_image_3d_keypoint_onnx_model() # OK
         # export_audio_face_render_onnx_model() # ???
-        # export_3dmm_keypoint_map_onnx_model()
+        # export_3dmm_keypoint_map_onnx_model() # OK
     
     if not (args.shape_test or args.bench_mark or args.export_onnx):
         parser.print_help()

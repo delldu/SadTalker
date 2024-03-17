@@ -26,14 +26,14 @@ class Audio2Exp(nn.Module):
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.58
 
         T = audio_mels.shape[1] # ==> 200
-        exp_predict_list: List[torch.Tensor] = []
+        # exp_predict_list: List[torch.Tensor] = []
+        exp_predict_list = []
 
         for i in range(0, T, 10): # every 10 frames
-            current_mel_input = audio_mels[:,i:i+10]
-            audio_mel = current_mel_input.view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
+            audio_mel = audio_mels[:, i:i+10, :, :, :].view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
 
-            image_exp = image_exp_pose[:, i:i+10, :64] # size() -- [1, 10, 64]
-            audio_ratio2 = audio_ratio[:, i:i+10]  # size() -- [1, 10, 1]
+            image_exp = image_exp_pose[:, i:i+10, 0:64] # size() -- [1, 10, 64]
+            audio_ratio2 = audio_ratio[:, i:i+10, :]  # size() -- [1, 10, 1]
             
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # self.netG -- Audio2ExpWrapperV2(...)
@@ -96,6 +96,7 @@ class Conv2dWithRes(nn.Module):
         return self.act(out)
 
 class Audio2ExpWrapperV2(nn.Module):
+    ''' come from wav2lip '''
     def __init__(self):
         super().__init__()
         self.audio_encoder = nn.Sequential(
@@ -123,7 +124,6 @@ class Audio2ExpWrapperV2(nn.Module):
         # tensor [audio_mel] size: [10, 1, 80, 16], min: -3.269791, max: 0.703544, mean: -1.632042
         # tensor [image_exp] size: [1, 10, 64], min: -1.156697, max: 1.459776, mean: 0.036036
         # tensor [audio_ratio] size: [1, 10, 1], min: 0.0, max: 0.0, mean: 0.0
-
         audio_mel = self.audio_encoder(audio_mel).view(audio_mel.size(0), -1) # size() -- [10, 512]
         ref_reshape = image_exp.reshape(audio_mel.size(0), -1) # size() -- [10, 64]
         audio_ratio = audio_ratio.reshape(audio_mel.size(0), -1) # size() -- [10, 1]
