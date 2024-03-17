@@ -70,13 +70,13 @@ def run_bench_mark():
     print(p.key_averages().table(sort_by="self_cuda_time_total", row_limit=-1))
     os.system("nvidia-smi | grep python")
 
-def export_image_3d_pose_exp_onnx_model():
+def export_image_3d_exp_pose_onnx_model():
     import onnx
     import onnxruntime
     from onnxsim import simplify
     import onnxoptimizer
 
-    print("Export image_3d_pose_exp onnx model ...")
+    print("Export image_3d_exp_pose onnx model ...")
 
     # 1. Run torch model
     model, device = SAD.get_model()
@@ -92,7 +92,7 @@ def export_image_3d_pose_exp_onnx_model():
     # 2. Export onnx model
     input_names = [ "input" ]
     output_names = [ "output" ]
-    onnx_filename = "output/image_3d_pose_exp.onnx"
+    onnx_filename = "output/image_3d_exp_pose.onnx"
 
     torch.onnx.export(model, 
         (dummy_input),
@@ -135,21 +135,21 @@ def export_image_3d_pose_exp_onnx_model():
 
     print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
 
-def export_audio_3d_pose_exp_onnx_model():
+def export_audio_3d_exp_pose_onnx_model():
     import onnx
     import onnxruntime
     from onnxsim import simplify
     import onnxoptimizer
 
-    print("Export audio_3d_pose_exp onnx model ...")
+    print("Export audio_3d_exp_pose onnx model ...")
 
     # 1. Run torch model
     model, device = SAD.get_model()
     model = model.audio2coffe_model
 
-    audio_mels_input = torch.randn(1, 20, 1, 80, 16).to(device)
-    audio_ratio_input = torch.randn(1, 20, 1).to(device)
-    image_exp_pose = torch.randn(1, 20, 70).to(device)
+    audio_mels_input = torch.randn(1, 32, 1, 80, 16).to(device)
+    audio_ratio_input = torch.randn(1, 32, 1).to(device)
+    image_exp_pose = torch.randn(1, 32, 70).to(device)
     # input ---- audio_mels, audio_ratio, image_exp_pose
     #   tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
     #   tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
@@ -163,7 +163,7 @@ def export_audio_3d_pose_exp_onnx_model():
     # 2. Export onnx model
     input_names = [ "audio_mels", "audio_ratio", "image_exp_pose"]
     output_names = [ "output" ]
-    onnx_filename = "output/audio_3d_pose_exp.onnx"
+    onnx_filename = "output/audio_3d_exp_pose.onnx"
     dynamic_axes = { 
         'audio_mels' : {1: 'nframes'}, 
         'audio_ratio' : {1: 'nframes'}, 
@@ -438,11 +438,13 @@ if __name__ == "__main__":
         run_bench_mark()
     if args.export_onnx:
         # Trace mode and CPU seems OK
-        # export_image_3d_pose_exp_onnx_model()
+        # export_image_3d_exp_pose_onnx_model() # OK !!!
+
+        export_audio_3d_exp_pose_onnx_model() # ???
+
         # export_image_3d_keypoint_onnx_model()
-        export_audio_face_render_onnx_model() # ???
+        # export_audio_face_render_onnx_model() # ???
         # export_3dmm_keypoint_map_onnx_model()
-        # export_audio_3d_pose_exp_onnx_model() # ???
     
     if not (args.shape_test or args.bench_mark or args.export_onnx):
         parser.print_help()

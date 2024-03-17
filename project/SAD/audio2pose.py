@@ -58,7 +58,6 @@ class Audio2Pose(nn.Module):
         pose_pred_list: List[torch.Tensor] = [torch.zeros(image_pose.unsqueeze(1).shape, 
                                 dtype=image_pose.dtype, 
                                 device=image_pose.device)]
-        # xxxx_8888
         for i in range(div):
             z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
             audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len : (i+1)*self.seq_len, :, :, :])
@@ -67,7 +66,8 @@ class Audio2Pose(nn.Module):
             y = self.netG(image_pose, class_id, z, audio_emb) # CVAE(...)
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             pose_pred_list.append(y)  #list of bs seq_len 6
-        
+
+        # xxxx_8888
         if re != 0:
             z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device)
             audio_emb = self.audio_encoder(indiv_mels_use[:, -1*self.seq_len:, :, :, :])
@@ -155,6 +155,7 @@ class ResUnet(nn.Module):
         )
 
     def forward(self, x):
+        x = x.unsqueeze(1)
         # Encode
         x1 = self.input_layer(x) + self.input_skip(x)
         x2 = self.residual_conv_1(x1)
@@ -165,20 +166,20 @@ class ResUnet(nn.Module):
 
         # Decode
         x4 = self.upsample_1(x4)
-        x5 = torch.cat([x4, x3], dim=1)
+        x6 = torch.cat([x4, x3], dim=1)
 
-        x6 = self.up_residual_conv1(x5)
+        x6 = self.up_residual_conv1(x6)
         x6 = self.upsample_2(x6)
-        x7 = torch.cat([x6, x2], dim=1)
-        x8 = self.up_residual_conv2(x7)
+        x8 = torch.cat([x6, x2], dim=1)
+        x8 = self.up_residual_conv2(x8)
         x8 = self.upsample_3(x8)
+
         x9 = torch.cat([x8, x1], dim=1)
+        x9 = self.up_residual_conv3(x9)
 
-        x10 = self.up_residual_conv3(x9)
+        output = self.output_layer(x9)
 
-        output = self.output_layer(x10)
-
-        return output
+        return output.squeeze(1)
 
 
 class Conv2d(nn.Module):
@@ -338,10 +339,10 @@ class Decoder(nn.Module):
         # tensor [audio_out] size: [1, 192], min: -2.997055, max: 1.522663, mean: -0.083217
         x_in = torch.cat([image_pose, z, audio_out], dim=1) # size() -- [1, 262]
         x_out = self.MLP(x_in) # size() -- [1, 192]
-        x_out = x_out.reshape((bs, self.seq_len, -1)) # self.seq_len === 32 ==> [1, 32, 6]
+        x_out = x_out.reshape((bs, self.seq_len, 6)) # self.seq_len === 32 ==> [1, 32, 6]
 
-        pose_emb = self.resunet(x_out.unsqueeze(1)) # size() -- [1, 1, 32, 6]
-        y = self.pose_linear(pose_emb.squeeze(1))
+        pose_emb = self.resunet(x_out)
+        y = self.pose_linear(pose_emb)
         # tensor [y] size: [1, 32, 6], min: -0.131533, max: 0.050444, mean: -0.009271
         
         return y # size() -- [1, 32, 6]

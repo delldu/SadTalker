@@ -192,11 +192,11 @@ class SADModel(nn.Module):
         audio_ratio = get_blink_seq_randomly(num_frames)
         audio_ratio = audio_ratio.unsqueeze(0).to(audio.device) # [1, 200, 1]
 
+        image_exp_pose = image_exp_pose.repeat(1, num_frames, 1) # [1, 70] ==> [1, 200, 70]
+
         # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
-        image_exp_pose = image_exp_pose.repeat(1, num_frames, 1) # [1, 70] ==> [1, 200, 70]
         # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
-
         audio_exp_pose = self.audio2coffe_model(audio_mels, audio_ratio, image_exp_pose)
         # tensor [audio_exp_pose] size: [200, 70], min: -1.703708, max: 1.255959, mean: -0.02074
 

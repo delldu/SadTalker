@@ -56,7 +56,6 @@ class MappingNet(nn.Module):
         self.fc_exp = nn.Linear(descriptor_nc, 3*num_kp)
 
     def forward(self, canonical_kp, input_3dmm):
-        """Audio Encoder --> Mapping ?"""
         # tensor [input_3dmm] size: [70, 27], min: -1.156697, max: 1.459776, mean: 0.023419
 
         out = self.first(input_3dmm.unsqueeze(0))

@@ -30,22 +30,23 @@ class Audio2Coeff(nn.Module):
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
         # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
 
-        with torch.no_grad():
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            exp_pred= self.audio2exp_model(audio_mels, image_exp_pose, audio_ratio) # Audio2Exp(...)
-            # tensor [exp_pred] size: [1, 200, 64], min: -1.673844, max: 1.242088, mean: -0.011497
+        # with torch.no_grad():
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        exp_pred= self.audio2exp_model(audio_mels, image_exp_pose, audio_ratio) # Audio2Exp(...)
+        # tensor [exp_pred] size: [1, 200, 64], min: -1.673844, max: 1.242088, mean: -0.011497
 
-            # 46 styles can be selected 
-            class_id = torch.LongTensor([pose_style]).to(exp_pred.device)
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred = self.audio2pose_model(audio_mels, image_exp_pose, audio_ratio, class_id) # Audio2Pose(...)
-            # tensor [pose_pred] size: [1, 200, 6], min: -0.809749, max: 0.27462, mean: -0.102681
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # 46 styles can be selected 
+        class_id = torch.LongTensor([pose_style]).to(exp_pred.device)
 
-            coeffs_pred = torch.cat((exp_pred, pose_pred), dim=2)
-            # tensor [coeffs_pred] size: [1, 200, 70], min: -1.690973, max: 1.272287, mean: -0.021126
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        pose_pred = self.audio2pose_model(audio_mels, image_exp_pose, audio_ratio, class_id) # Audio2Pose(...)
+        # tensor [pose_pred] size: [1, 200, 6], min: -0.809749, max: 0.27462, mean: -0.102681
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            return coeffs_pred.squeeze(0) # coeffs_pred.size() -- [200, 70]
+        coeffs_pred = torch.cat((exp_pred, pose_pred), dim=2)
+        # tensor [coeffs_pred] size: [1, 200, 70], min: -1.690973, max: 1.272287, mean: -0.021126
+
+        return coeffs_pred.squeeze(0) # coeffs_pred.size() -- [200, 70]
