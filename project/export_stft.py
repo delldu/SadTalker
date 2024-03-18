@@ -62,6 +62,7 @@ class STFT(nn.Module):
             stride=self.hop_length,
             padding=0)
 
+
         cutoff = int((self.filter_length / 2) + 1)
         real_part = forward_transform[:, :cutoff, :]
         imag_part = forward_transform[:, cutoff:, :]
@@ -76,14 +77,6 @@ class AudioSpectrogram(nn.Module):
         super().__init__()
         self.stft = STFT(hop_length=200, win_length=800)
 
-    def forward(self, wav):
-        B = wav.shape[0]
-
-        # Pre-emphasizes a waveform along its last dimension
-        # tensor [wav] size: [200, 640], min: -1.013043, max: 1.073747, mean: -8.6e-05
-        wav = torchaudio.functional.preemphasis(wav, coeff = 0.97) 
-        # tensor [wav] size: [200, 640], min: -0.850947, max: 0.888253, mean: 2e-05
-
         # Mel Filter Bank, generates the filter bank for converting frequency bins to mel-scale bins
         # Create a frequency bin conversion matrix.
         mel_filters = torchaudio.functional.melscale_fbanks(
@@ -93,9 +86,17 @@ class AudioSpectrogram(nn.Module):
             f_max=7600.0, # hp.fmax,
             sample_rate=16000, # hp.sample_rate,
             norm="slaney",
-        ).to(wav.device)
-
+        )
         # tensor [mel_filters] size: [401, 80], min: 0.0, max: 0.040298, mean: 0.000125
+        self.register_buffer('mel_filters', mel_filters)
+
+    def forward(self, wav):
+        B = wav.shape[0]
+
+        # Pre-emphasizes a waveform along its last dimension
+        # tensor [wav] size: [200, 640], min: -1.013043, max: 1.073747, mean: -8.6e-05
+        wav = torchaudio.functional.preemphasis(wav, coeff = 0.97)
+        # tensor [wav] size: [200, 640], min: -0.850947, max: 0.888253, mean: 2e-05
 
         # D = torchaudio.functional.spectrogram(
         #     wav.reshape(-1), # should 1-D data
@@ -107,7 +108,7 @@ class AudioSpectrogram(nn.Module):
 
         D = self.stft(wav.reshape(1, -1)).squeeze(0)
 
-        S = torch.mm(mel_filters.T, D) # mel_filters.T.size() -- [80, 401]
+        S = torch.mm(self.mel_filters.T, D) # mel_filters.T.size() -- [80, 401]
         # tensor [S] size: [80, 641], min: 5.4e-05, max: 1.314648, mean: 0.017384
 
         # Amp to DB
@@ -121,43 +122,45 @@ class AudioSpectrogram(nn.Module):
         # S =torch.clamp(S, -hp.max_abs_value, hp.max_abs_value)
         S = 8.0 * ((S + 100.0) / 100.0) - 4.0
 
-        orig_mel = S.clamp(-4.0, 4.0).transpose(1, 0) # size() -- [641, 80]
+        orig_mel = torch.clamp(S, -4.0, 4.0).transpose(1, 0) # size() -- [641, 80]
         # tensor [orig_mel] size: [641, 80], min: -4.0, max: 2.590095, mean: -1.016412
+        return orig_mel
 
-        mels_list = []
-        mel_step_size = 16
-        for i in range(B): # B -- 200
-            start_frame_num = i - 2
-            start_idx = int(80 * (start_frame_num/25.0)) #hp.num_mels -- 80, hp.fps = 25.0
-            end_idx = start_idx + mel_step_size
-            seq = list(range(start_idx, end_idx))
-            seq = [ min(max(item, 0), orig_mel.shape[0] - 1) for item in seq ]
+        # mels_list = []
+        # mel_step_size = 16
+        # for i in range(B): # B -- 200
+        #     start_frame_num = i - 2
+        #     start_idx = int(80 * (start_frame_num/25.0)) #hp.num_mels -- 80, hp.fps = 25.0
+        #     end_idx = start_idx + mel_step_size
+        #     seq = list(range(start_idx, end_idx))
+        #     seq = [ min(max(item, 0), orig_mel.shape[0] - 1) for item in seq ]
 
-            m = orig_mel[seq, :]
-            mels_list.append(m.transpose(1, 0))
+        #     m = orig_mel[seq, :]
+        #     mels_list.append(m.transpose(1, 0))
 
-        # mels[0] size() -- [80, 16]
-        mels = torch.stack(mels_list, dim=0)
-        mels = mels.unsqueeze(0) # size() -- [1, 200, 80, 16]
+        # # mels[0] size() -- [80, 16]
+        # mels = torch.stack(mels_list, dim=0)
+        # mels = mels.unsqueeze(0) # size() -- [1, 200, 80, 16]
 
-        return mels
+        # return mels
 
 
 def export_audio_spectrogram_onnx_model():
     print("Export audio_spectrogram onnx model ...")
 
     # 1. Run torch model
-    device = torch.device("cpu")
+    device = todos.model.get_device()
     model = AudioSpectrogram()
     model = model.to(device)
     model.eval()
 
+    # Only support trace mode !!!
     # torch._C._jit_set_profiling_executor(False)
     # model = torch.jit.script(model)
 
     wav = torch.randn(200, 640).to(device)
     with torch.no_grad():
-        dummy_output = model(wav) # [1, 200, 80, 16]
+        dummy_output = model(wav) # [641, 80] # [1, 200, 80, 16]
 
     torch_outputs = [dummy_output.cpu()]
 
@@ -168,7 +171,7 @@ def export_audio_spectrogram_onnx_model():
 
     dynamic_axes = { 
         'wav' : {0: 'nframes'}, 
-        'output' : {1: 'nframes'} 
+        'output' : {0: 'nframes'} 
     }  
 
     torch.onnx.export(model, 
@@ -184,10 +187,10 @@ def export_audio_spectrogram_onnx_model():
     # 3. Check onnx model file
     onnx_model = onnx.load(onnx_filename)
     onnx.checker.check_model(onnx_model)
-    # onnx_model, check = simplify(onnx_model)
-    # assert check, "Simplified ONNX model could not be validated"
-    # onnx_model = onnxoptimizer.optimize(onnx_model)
-    # onnx.save(onnx_model, onnx_filename)
+    onnx_model, check = simplify(onnx_model)
+    assert check, "Simplified ONNX model could not be validated"
+    onnx_model = onnxoptimizer.optimize(onnx_model)
+    onnx.save(onnx_model, onnx_filename)
     # print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
