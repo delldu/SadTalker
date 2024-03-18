@@ -16,6 +16,12 @@ import argparse
 import todos
 import pdb
 
+import onnx
+import onnxruntime
+from onnxsim import simplify
+import onnxoptimizer
+
+
 def test_input_shape():
     import time
     import random
@@ -71,11 +77,6 @@ def run_bench_mark():
     os.system("nvidia-smi | grep python")
 
 def export_image_3d_exp_pose_onnx_model():
-    import onnx
-    import onnxruntime
-    from onnxsim import simplify
-    import onnxoptimizer
-
     print("Export image_3d_exp_pose onnx model ...")
 
     # 1. Run torch model
@@ -136,11 +137,6 @@ def export_image_3d_exp_pose_onnx_model():
     print("!!!!!! Torch and ONNX Runtime output matched !!!!!!")
 
 def export_audio_3d_exp_pose_onnx_model():
-    import onnx
-    import onnxruntime
-    from onnxsim import simplify
-    import onnxoptimizer
-
     print("Export audio_3d_exp_pose onnx model ...")
 
     # 1. Run torch model
@@ -220,11 +216,6 @@ def export_audio_3d_exp_pose_onnx_model():
 
 
 def export_image_3d_keypoint_onnx_model():
-    import onnx
-    import onnxruntime
-    from onnxsim import simplify
-    import onnxoptimizer
-
     print("Export image_3d_keypoint onnx model ...")
 
     # 1. Run torch model
@@ -286,17 +277,16 @@ def export_image_3d_keypoint_onnx_model():
 
 
 def export_audio_face_render_onnx_model():
-    import onnx
-    import onnxruntime
-    from onnxsim import simplify
-    import onnxoptimizer
-    from torch.onnx import TrainingMode
-
     print("Export audio_face_render onnx model ...")
 
     # 1. Run torch model
     model, device = SAD.get_trace_model()
     model = model.sadkernel_model
+
+    # Set device on cpu
+    device = torch.device("cpu")
+    model = model.to(device)
+    print(f"Change model device to {device} ...")
 
     B, C, H, W = 1, 3, 512, 512
     image = torch.randn(B, C, H, W).to(device) # source_kp
@@ -358,11 +348,6 @@ def export_audio_face_render_onnx_model():
 
 
 def export_3dmm_keypoint_map_onnx_model():
-    import onnx
-    import onnxruntime
-    from onnxsim import simplify
-    import onnxoptimizer
-
     print("Export 3dmm_keypoint_map onnx model ...")
 
     # 1. Run torch model
@@ -371,9 +356,6 @@ def export_3dmm_keypoint_map_onnx_model():
 
     input_kp = torch.randn(1, 15, 3).to(device)
     input_3dmm = torch.randn(70, 27).to(device)
-
-    input_kp = torch.load("/tmp/input_kp.tensor").to(device)
-    input_3dmm = torch.load("/tmp/input_3dmm.tensor").to(device)
 
     # input ---- input_kp, input_3dmm
     # tensor [input_kp] size: [1, 15, 3], min: -0.891859, max: 0.950069, mean: 0.015366
@@ -449,6 +431,5 @@ if __name__ == "__main__":
         export_image_3d_keypoint_onnx_model() # OK
         export_audio_face_render_onnx_model() # Trace Mode on CPU OK
         export_3dmm_keypoint_map_onnx_model() # OK !!!
-    
     if not (args.shape_test or args.bench_mark or args.export_onnx):
         parser.print_help()

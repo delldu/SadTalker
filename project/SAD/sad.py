@@ -84,6 +84,7 @@ class SADModel(nn.Module):
 
     # https://pytorch.org/audio/stable/tutorials/audio_feature_extractions_tutorial.html
     # https://zhuanlan.zhihu.com/p/315866473
+    # audio_spectrogram.onnx
     def get_mel_spectrogram(self, wav):
         '''
         wav must be BxS format !!!
@@ -123,6 +124,7 @@ class SADModel(nn.Module):
         )
         # tensor [mel_filters] size: [401, 80], min: 0.0, max: 0.040298, mean: 0.000125
 
+        # https://lukaprincic.si/development-log/ffmpeg-audio-visualization-tricks
         D = torchaudio.functional.spectrogram(
             wav.reshape(-1), # should 1-D data
             pad=0, window=torch.hann_window(800),
@@ -186,7 +188,6 @@ class SADModel(nn.Module):
 
         num_frames = audio.shape[0]
         audio_mels = self.get_mel_spectrogram(audio.cpu()).to(audio.device)
-
         audio_ratio = get_blink_seq_randomly(num_frames)
         audio_ratio = audio_ratio.unsqueeze(0).to(audio.device) # [1, 200, 1]
 
