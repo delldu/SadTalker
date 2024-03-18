@@ -95,7 +95,7 @@ class SADKernel(nn.Module):
 
     def deform_input(self, input, deformation):
         # tensor [input] size: [1, 32, 16, 128, 128], min: -102.424561, max: 113.730629, mean: 0.687735
-        _, _, d, h, w = input.shape
+        _, _, d, h, w = input.size()
         deformation = deformation.permute(0, 4, 1, 2, 3)
         deformation = F.interpolate(deformation, size=(d, h, w), mode='trilinear')
         deformation = deformation.permute(0, 2, 3, 4, 1)
@@ -114,7 +114,7 @@ class SADKernel(nn.Module):
             out = m(out)
 
         out = self.second(out)
-        bs, c, h, w = out.shape
+        bs, c, h, w = out.size()
         feature_3d = out.view(bs, self.reshape_channel, self.reshape_depth, h ,w) 
         feature_3d = self.resblocks_3d(feature_3d)
 
@@ -129,7 +129,7 @@ class SADKernel(nn.Module):
 
         out = self.deform_input(feature_3d, deformation)
 
-        bs, c, d, h, w = out.shape
+        bs, c, d, h, w = out.size()
         out = out.view(bs, c*d, h, w)
         out = self.third(out)
         out = self.fourth(out)
@@ -173,7 +173,7 @@ class SPADEDecoder(nn.Module):
         x = self.up(x)                
         x = self.up_1(x, seg)         # 64, 256, 256
 
-        x = self.conv_img(F.leaky_relu(x, 2e-1))
+        x = self.conv_img(F.leaky_relu(x, 0.2))
         x = F.sigmoid(x)
 
         # tensor [x] size: [1, 3, 512, 512], min: 0.000365, max: 0.982053, mean: 0.578382
@@ -257,19 +257,15 @@ class SPADEResnetBlock(nn.Module):
         self.norm_0 = SPADE(fin, label_nc)
         self.norm_1 = SPADE(fmiddle, label_nc)
 
-    def forward(self, x, seg1):
-        x_s = self.shortcut(x, seg1)
+    def actvn(self, x):
+        return F.leaky_relu(x, 0.2)
 
+    def forward(self, x, seg1):
+        x_s = x
         dx = self.conv_0(self.actvn(self.norm_0(x, seg1)))
         dx = self.conv_1(self.actvn(self.norm_1(dx, seg1)))
         out = x_s + dx
         return out
-
-    def shortcut(self, x, seg1):
-        return x
-
-    def actvn(self, x):
-        return F.leaky_relu(x, 2e-1)
 
 
 class ShortcutSPADEResnetBlock(nn.Module):
@@ -295,6 +291,12 @@ class ShortcutSPADEResnetBlock(nn.Module):
         self.norm_1 = SPADE(fmiddle, label_nc)
         self.norm_s = SPADE(fin, label_nc)
 
+    def shortcut(self, x, seg1):
+        return self.conv_s(self.norm_s(x, seg1))
+
+    def actvn(self, x):
+        return F.leaky_relu(x, 0.2)
+
     def forward(self, x, seg1):
         x_s = self.shortcut(x, seg1)
 
@@ -302,13 +304,6 @@ class ShortcutSPADEResnetBlock(nn.Module):
         dx = self.conv_1(self.actvn(self.norm_1(dx, seg1)))
         out = x_s + dx
         return out
-
-    def shortcut(self, x, seg1):
-        return self.conv_s(self.norm_s(x, seg1))
-
-    def actvn(self, x):
-        return F.leaky_relu(x, 2e-1)
-
 
 class ResBlock3d(nn.Module):
     """Res block, preserve spatial resolution. """

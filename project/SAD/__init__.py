@@ -70,22 +70,11 @@ def get_trace_model():
     """
     Create model
     """
-
     model = SADModel()
     device = todos.model.get_device()
     model = model.to(device)
     model.eval()
     print(f"Running model on {device} ...")
-
-    # for n, m in model.named_modules():
-    #     if isinstance(m, nn.BatchNorm3d) or isinstance(m, nn.BatchNorm2d):
-    #         # pdb.set_trace()
-    #         # m.train()
-    #         # m.train(False)
-    #         # print(n, m.__class__.__name__)
-    #         m.track_running_stats = False
-    #         # print(m.state_dict())
-    # # pdb.set_trace()
 
     return model, device
 
@@ -113,13 +102,15 @@ def get_script_model():
 
 def load_wav(audio_path, new_sample_rate=16000):
     waveform, sample_rate = torchaudio.load(audio_path)
+    # sample_rate -- 48000
     waveform = torchaudio.functional.resample(waveform, orig_freq=sample_rate, new_freq=new_sample_rate)
+    # tensor [waveform] size: [2, 128000], min: -1.017991, max: 1.073747, mean: -8.3e-05
     waveform = waveform[0] # half enough for application
 
     # Parse audio length
     fps = 25
-    bit_per_frames = new_sample_rate / fps
-    num_frames = int(len(waveform) / bit_per_frames)
+    bit_per_frames = new_sample_rate / fps # 640
+    num_frames = int(len(waveform) / bit_per_frames) # 128000/640 ==> 200
     wav_length = int(num_frames * bit_per_frames)
 
     # Crop pad

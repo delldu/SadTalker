@@ -24,7 +24,7 @@ from SAD.sadkernel import SADKernel
 from SAD.keypoint_detector import KeypointDetector
 from SAD.mapping import MappingNet
 from SAD.util import load_weights, draw_keypoint
-from typing import Tuple
+
 from tqdm import tqdm
 import todos
 import pdb
@@ -105,9 +105,14 @@ class SADModel(nn.Module):
 
         '''
         B = wav.shape[0]
-        wav = torchaudio.functional.preemphasis(wav, coeff = 0.97) # 0.97 -- hp.preemphasis
+
+        # Pre-emphasizes a waveform along its last dimension
+        # tensor [wav] size: [200, 640], min: -1.013043, max: 1.073747, mean: -8.6e-05
+        wav = torchaudio.functional.preemphasis(wav, coeff = 0.97) # y[i]=x[i] − 0.97* x[i−1] 
+        # tensor [wav] size: [200, 640], min: -0.850947, max: 0.888253, mean: 2e-05
 
         # Mel Filter Bank, generates the filter bank for converting frequency bins to mel-scale bins
+        # Create a frequency bin conversion matrix.
         mel_filters = torchaudio.functional.melscale_fbanks(
             401, # int(hp.n_fft // 2 + 1),
             n_mels=80, # hp.num_mels,
@@ -116,13 +121,18 @@ class SADModel(nn.Module):
             sample_rate=16000, # hp.sample_rate,
             norm="slaney",
         )
+        # tensor [mel_filters] size: [401, 80], min: 0.0, max: 0.040298, mean: 0.000125
+
         D = torchaudio.functional.spectrogram(
             wav.reshape(-1), # should 1-D data
             pad=0, window=torch.hann_window(800),
             n_fft=800, win_length=800, hop_length=200,
             power=1.0, normalized=False, # !!! here two items configuration is very import !!!
-        ) # ==> [401, 641]
+        )
+        # tensor [D] size: [401, 641], min: 3.3e-05, max: 38.887188, mean: 0.333159
+
         S = torch.mm(mel_filters.T, D) # mel_filters.T.size() -- [80, 401]
+        # tensor [S] size: [80, 641], min: 5.4e-05, max: 1.314648, mean: 0.017384
 
         # Amp to DB
         # min_level = math.exp(hp.min_level_db / 20.0 * math.log(10.0))
@@ -130,40 +140,33 @@ class SADModel(nn.Module):
         S = torch.clamp(S, 9.9999e-06)
         S = 20.0 * torch.log10(S) - 20.0
 
-        # normalize
+        # Normalize
         # S = (2 * hp.max_abs_value) * ((S - hp.min_level_db) / (-hp.min_level_db)) - hp.max_abs_value    
         # S =torch.clip(S, -hp.max_abs_value, hp.max_abs_value)
         S = 8.0 * ((S + 100.0) / 100.0) - 4.0
+
         orig_mel = torch.clip(S, -4.0, 4.0).transpose(1, 0) # size() -- [641, 80]
+        # tensor [orig_mel] size: [641, 80], min: -4.0, max: 2.590095, mean: -1.016412
 
         mels_list = []
         mel_step_size = 16
-        for i in range(B):
+        for i in range(B): # B -- 200
             start_frame_num = i - 2
             start_idx = int(80 * (start_frame_num/25.0)) #hp.num_mels -- 80, hp.fps = 25.0
             end_idx = start_idx + mel_step_size
             seq = list(range(start_idx, end_idx))
-            seq = [ min(max(item, 0), orig_mel.shape[0] - 1) for item in seq ] # orig_mel.shape -- (641, 80)
+            seq = [ min(max(item, 0), orig_mel.shape[0] - 1) for item in seq ]
+
             m = orig_mel[seq, :]
             mels_list.append(m.transpose(1, 0))
+            # m = orig_mel[:, seq]
+            # mels_list.append(m)
+
         # mels[0] size() -- [80, 16]
         mels = torch.stack(mels_list, dim=0)
         mels = mels.unsqueeze(1).unsqueeze(0) # size() -- [1, 200, 1, 80, 16]
+
         return mels
-
-    def get_mel_spectrogram2(self, wav):
-        transform = torchaudio.transforms.MelSpectrogram(
-            sample_rate=16000, 
-            pad=0, 
-            # window_fn=torch.hann_window(800),
-            n_fft=800, win_length=800, hop_length=200,            
-            n_mels=80, f_min=55.0, f_max=7600.0,
-            power=1.0, normalized=False,
-            norm="slaney",
-        )
-        mel_specgram = transform(wav)
-        return mel_specgram
-
 
 
     def forward(self, audio, image):
@@ -185,9 +188,6 @@ class SADModel(nn.Module):
 
         num_frames = audio.shape[0]
         audio_mels = self.get_mel_spectrogram(audio.cpu()).to(audio.device)
-        # audio_mels2 = self.get_mel_spectrogram2(audio.cpu()).to(audio.device)
-        # todos.debug.output_var("audio_mels", audio_mels)
-        # todos.debug.output_var("audio_mels2", audio_mels2)
 
         audio_ratio = get_blink_seq_randomly(num_frames)
         audio_ratio = audio_ratio.unsqueeze(0).to(audio.device) # [1, 200, 1]

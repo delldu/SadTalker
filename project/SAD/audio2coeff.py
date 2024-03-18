@@ -30,12 +30,9 @@ class Audio2Coeff(nn.Module):
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
         # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
 
-        # with torch.no_grad():
-
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         exp_pred= self.audio2exp_model(audio_mels, image_exp_pose, audio_ratio) # Audio2Exp(...)
         # tensor [exp_pred] size: [1, 200, 64], min: -1.673844, max: 1.242088, mean: -0.011497
-
         # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         # 46 styles can be selected 

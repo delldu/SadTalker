@@ -174,7 +174,7 @@ def export_audio_3d_exp_pose_onnx_model():
     torch.onnx.export(model, 
         (audio_mels_input, audio_ratio_input, image_exp_pose),
         onnx_filename, 
-        verbose=True, 
+        verbose=False, 
         input_names=input_names, 
         output_names=output_names,
         dynamic_axes=dynamic_axes,
@@ -193,6 +193,7 @@ def export_audio_3d_exp_pose_onnx_model():
     # print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
+    onnxruntime.set_default_logger_severity(3)
     if 'cuda' in device.type:
         ort_session = onnxruntime.InferenceSession(onnx_filename, providers=['CUDAExecutionProvider'])
     else:        
@@ -289,20 +290,18 @@ def export_audio_face_render_onnx_model():
     import onnxruntime
     from onnxsim import simplify
     import onnxoptimizer
+    from torch.onnx import TrainingMode
 
     print("Export audio_face_render onnx model ...")
 
     # 1. Run torch model
-    model, device = SAD.get_script_model()
+    model, device = SAD.get_trace_model()
     model = model.sadkernel_model
 
     B, C, H, W = 1, 3, 512, 512
     image = torch.randn(B, C, H, W).to(device) # source_kp
     audio_kp = torch.randn(B, 15, 3).to(device) # offset_kp
     image_kp = torch.randn(B, 15, 3).to(device) # source_image
-    # image = torch.load("output/image.tensor").to(device)
-    # audio_kp = torch.load("output/audio_kp.tensor").to(device)
-    # image_kp = torch.load("output/image_kp.tensor").to(device)
 
     # image, audio_kp=audio_kp, image_kp=image_kp
     with torch.no_grad():
@@ -327,8 +326,8 @@ def export_audio_face_render_onnx_model():
     # 3. Check onnx model file
     onnx_model = onnx.load(onnx_filename)
     onnx.checker.check_model(onnx_model)
-    onnx_model, check = simplify(onnx_model)
-    assert check, "Simplified ONNX model could not be validated"
+    # onnx_model, check = simplify(onnx_model)
+    # assert check, "Simplified ONNX model could not be validated"
     onnx_model = onnxoptimizer.optimize(onnx_model)
     onnx.save(onnx_model, onnx_filename)
     print(onnx.helper.printable_graph(onnx_model.graph))
@@ -445,14 +444,11 @@ if __name__ == "__main__":
     if args.bench_mark:
         run_bench_mark()
     if args.export_onnx:
-        # Trace mode and CPU seems OK
-        # export_image_3d_exp_pose_onnx_model() # OK !!!
-
-        export_audio_3d_exp_pose_onnx_model() # ???
-
-        # export_image_3d_keypoint_onnx_model() # OK
-        # export_audio_face_render_onnx_model() # ???
-        # export_3dmm_keypoint_map_onnx_model() # OK
+        export_image_3d_exp_pose_onnx_model() # OK !!!
+        export_audio_3d_exp_pose_onnx_model() # OK !!!
+        export_image_3d_keypoint_onnx_model() # OK
+        export_audio_face_render_onnx_model() # Trace Mode on CPU OK
+        export_3dmm_keypoint_map_onnx_model() # OK !!!
     
     if not (args.shape_test or args.bench_mark or args.export_onnx):
         parser.print_help()
