@@ -52,9 +52,8 @@ class Audio2Pose(nn.Module):
         image_pose = image_exp_pose[:, 0, 64:70]  # [1, 200, 70] ==> [1, 6]
 
         # we regard the reference as the first frame
-        indiv_mels_use =audio_mels[:, 1:] # size() -- [1, 224, 1, 80, 16], 
-        num_frames = audio_mels.shape[1] # 200
-        num_frames = int(num_frames) - 1 # ==> 199
+        indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 224, 1, 80, 16], 
+        num_frames = int(audio_mels.shape[1]) - 1 # ==> 199
         # num_frames = C + pad -1 # int(num_frames) - 1 # ==> 224
 
         div = num_frames // self.seq_len # ==> 7

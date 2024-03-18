@@ -48,7 +48,7 @@ class DenseMotionNetwork(nn.Module):
         self.mask = nn.Conv3d(self.hourglass.out_filters, num_kp + 1, kernel_size=7, padding=3)
 
         self.compress = nn.Conv3d(feature_channel, compress, kernel_size=1)
-        self.norm = nn.BatchNorm3d(compress) # , affine=True)
+        self.norm = nn.BatchNorm3d(compress, affine=True)
         self.occlusion = nn.Conv2d(self.hourglass.out_filters*reshape_depth, 1, kernel_size=7, padding=3)
         self.num_kp = num_kp
 
@@ -185,7 +185,7 @@ class HourglassDecoder(nn.Module):
         self.out_filters = block_expansion + in_features
 
         self.conv = nn.Conv3d(in_channels=self.out_filters, out_channels=self.out_filters, kernel_size=3, padding=1)
-        self.norm = nn.BatchNorm3d(self.out_filters) #, affine=True)
+        self.norm = nn.BatchNorm3d(self.out_filters, affine=True)
 
     def forward(self, x: List[torch.Tensor]):
         # x is list: len = 6
