@@ -9,12 +9,9 @@
 # ************************************************************************************/
 #
 
-import math
-import numpy as np
-
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import SAD
 
 import onnx
 import onnxruntime
@@ -26,56 +23,10 @@ import torchaudio
 import todos
 import pdb
 
-
-# https://github.com/NVIDIA/mellotron/blob/master/stft.py
-class STFT(nn.Module):
-    """adapted from Prem Seetharaman's https://github.com/pseeth/pytorch-stft"""
-    def __init__(self, filter_length=800, hop_length=200, win_length=800):
-        super().__init__()
-        self.filter_length = filter_length
-        self.hop_length = hop_length
-        cutoff = int((self.filter_length / 2 + 1))
-
-        fourier_basis = np.fft.fft(np.eye(self.filter_length))
-        fourier_basis = np.vstack([np.real(fourier_basis[:cutoff, :]), 
-                        np.imag(fourier_basis[:cutoff, :])])
-        forward_basis = torch.FloatTensor(fourier_basis[:, None, :])
-        fft_window = torch.hann_window(win_length)
-
-        self.register_buffer('forward_basis', forward_basis * fft_window)
-
-    def forward(self, input_data):
-        num_batches = input_data.size(0)
-        num_samples = input_data.size(1)
-
-        # similar to librosa, reflect-pad the input
-        input_data = input_data.view(num_batches, 1, num_samples)
-        input_data = F.pad(
-            input_data.unsqueeze(1),
-            (int(self.filter_length / 2), int(self.filter_length / 2), 0, 0),
-            mode='reflect')
-        input_data = input_data.squeeze(1) # [1, 1, 1, 128800]--> [1, 1, 128800]
-
-        forward_transform = F.conv1d(
-            input_data,
-            self.forward_basis,
-            stride=self.hop_length,
-            padding=0)
-
-
-        cutoff = int((self.filter_length / 2) + 1)
-        real_part = forward_transform[:, :cutoff, :]
-        imag_part = forward_transform[:, cutoff:, :]
-
-        magnitude = torch.sqrt(real_part**2 + imag_part**2)
-
-        return magnitude
-
-
 class AudioSpectrogram(nn.Module):
     def __init__(self):
         super().__init__()
-        self.stft = STFT(hop_length=200, win_length=800)
+        self.stft = SAD.sad.STFT(hop_length=200, win_length=800)
 
         # Mel Filter Bank, generates the filter bank for converting frequency bins to mel-scale bins
         # Create a frequency bin conversion matrix.

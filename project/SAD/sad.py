@@ -16,7 +16,10 @@
 import random
 import torch
 from torch import nn
+import torch.nn.functional as F
+
 import torchaudio
+import numpy as np
 
 from SAD.image2coeff import Image2Coeff
 from SAD.audio2coeff import Audio2Coeff
@@ -28,6 +31,51 @@ from SAD.util import load_weights, draw_keypoint
 from tqdm import tqdm
 import todos
 import pdb
+
+# onnx does not support aten::stft, so we use the following instead of it
+# https://github.com/NVIDIA/mellotron/blob/master/stft.py
+class STFT(nn.Module):
+    """adapted from Prem Seetharaman's https://github.com/pseeth/pytorch-stft"""
+    def __init__(self, filter_length=800, hop_length=200, win_length=800):
+        super().__init__()
+        self.filter_length = filter_length
+        self.hop_length = hop_length
+        cutoff = int((self.filter_length / 2 + 1))
+
+        fourier_basis = np.fft.fft(np.eye(self.filter_length))
+        fourier_basis = np.vstack([np.real(fourier_basis[:cutoff, :]), 
+                        np.imag(fourier_basis[:cutoff, :])])
+        forward_basis = torch.FloatTensor(fourier_basis[:, None, :])
+        fft_window = torch.hann_window(win_length)
+
+        self.register_buffer('forward_basis', forward_basis * fft_window)
+
+    def forward(self, input_data):
+        num_batches = input_data.size(0)
+        num_samples = input_data.size(1)
+
+        # similar to librosa, reflect-pad the input
+        input_data = input_data.view(num_batches, 1, num_samples)
+        input_data = F.pad(
+            input_data.unsqueeze(1),
+            (int(self.filter_length / 2), int(self.filter_length / 2), 0, 0),
+            mode='reflect')
+        input_data = input_data.squeeze(1) # [1, 1, 1, 128800]--> [1, 1, 128800]
+
+        forward_transform = F.conv1d(
+            input_data,
+            self.forward_basis,
+            stride=self.hop_length,
+            padding=0)
+
+        cutoff = int((self.filter_length / 2) + 1)
+        real_part = forward_transform[:, :cutoff, :]
+        imag_part = forward_transform[:, cutoff:, :]
+
+        magnitude = torch.sqrt(real_part**2 + imag_part**2)
+
+        return magnitude
+
 
 
 def get_blink_seq_randomly(num_frames: int):
@@ -81,6 +129,8 @@ class SADModel(nn.Module):
 
         load_weights(self, model_path="models/SAD.pth")
 
+        self.stft = STFT()
+
 
     # https://pytorch.org/audio/stable/tutorials/audio_feature_extractions_tutorial.html
     # https://zhuanlan.zhihu.com/p/315866473
@@ -121,16 +171,17 @@ class SADModel(nn.Module):
             f_max=7600.0, # hp.fmax,
             sample_rate=16000, # hp.sample_rate,
             norm="slaney",
-        )
+        ).to(wav.device)
         # tensor [mel_filters] size: [401, 80], min: 0.0, max: 0.040298, mean: 0.000125
 
         # https://lukaprincic.si/development-log/ffmpeg-audio-visualization-tricks
-        D = torchaudio.functional.spectrogram(
-            wav.reshape(-1), # should 1-D data
-            pad=0, window=torch.hann_window(800),
-            n_fft=800, win_length=800, hop_length=200,
-            power=1.0, normalized=False, # !!! here two items configuration is very import !!!
-        )
+        # D = torchaudio.functional.spectrogram(
+        #     wav.reshape(-1), # should 1-D data
+        #     pad=0, window=torch.hann_window(800),
+        #     n_fft=800, win_length=800, hop_length=200,
+        #     power=1.0, normalized=False, # !!! here two items configuration is very import !!!
+        # )
+        D = self.stft(wav.reshape(1, -1)).squeeze(0)
         # tensor [D] size: [401, 641], min: 3.3e-05, max: 38.887188, mean: 0.333159
 
         S = torch.mm(mel_filters.T, D) # mel_filters.T.size() -- [80, 401]
@@ -187,7 +238,7 @@ class SADModel(nn.Module):
         # tensor [image_kp] size: [1, 15, 3], min: -0.847928, max: 0.93429, mean: 0.040402
 
         num_frames = audio.shape[0]
-        audio_mels = self.get_mel_spectrogram(audio.cpu()).to(audio.device)
+        audio_mels = self.get_mel_spectrogram(audio) #.to(audio.device)
         audio_ratio = get_blink_seq_randomly(num_frames)
         audio_ratio = audio_ratio.unsqueeze(0).to(audio.device) # [1, 200, 1]
 
