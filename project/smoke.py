@@ -147,11 +147,11 @@ def export_audio_3d_exp_pose_onnx_model():
     model, device = SAD.get_script_model()
     model = model.audio2coffe_model
 
-    audio_mels_input = torch.randn(1, 40, 1, 80, 16).to(device)
+    audio_mels_input = torch.randn(1, 40, 80, 16).to(device)
     audio_ratio_input = torch.randn(1, 40, 1).to(device)
     image_exp_pose = torch.randn(1, 40, 70).to(device)
     # input ---- audio_mels, audio_ratio, image_exp_pose
-    #   tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+    #   tensor [audio_mels] size: [1, 200, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
     #   tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
     #   tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
     # output ---- tensor [audio_exp_pose] size: [200, 70], min: -1.703708, max: 1.255959, mean: -0.02074
@@ -330,7 +330,7 @@ def export_audio_face_render_onnx_model():
     # assert check, "Simplified ONNX model could not be validated"
     onnx_model = onnxoptimizer.optimize(onnx_model)
     onnx.save(onnx_model, onnx_filename)
-    print(onnx.helper.printable_graph(onnx_model.graph))
+    # print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
     if 'cuda' in device.type:
@@ -392,7 +392,7 @@ def export_3dmm_keypoint_map_onnx_model():
     torch.onnx.export(model, 
         (input_kp, input_3dmm),
         onnx_filename, 
-        verbose=True, 
+        verbose=False, 
         input_names=input_names, 
         output_names=output_names,
         opset_version=16,
@@ -405,7 +405,7 @@ def export_3dmm_keypoint_map_onnx_model():
     # assert check, "Simplified ONNX model could not be validated"
     onnx_model = onnxoptimizer.optimize(onnx_model)
     onnx.save(onnx_model, onnx_filename)
-    print(onnx.helper.printable_graph(onnx_model.graph))
+    # print(onnx.helper.printable_graph(onnx_model.graph))
 
     # 4. Run onnx model
     if 'cuda' in device.type:

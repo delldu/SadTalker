@@ -35,15 +35,15 @@ class Audio2Pose(nn.Module):
         self.netG = CVAE()
 
     def forward(self, audio_mels, image_exp_pose, audio_ratio, class_id):
-        # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+        # tensor [audio_mels] size: [1, 200, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
         # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6565
         # tensor [class_id] size: [1], min: 0.0, max: 0.0, mean: 0.0
 
-        B, C, D, H, W = audio_mels.size()
-        # pad = self.seq_len - (C % self.seq_len) + 1 # 25
-        # audio_mels_pad = torch.zeros(B, C + pad, D, H, W).to(audio_mels.device)
-        # audio_mels_pad[:, 0:C, :, :, :] = audio_mels
+        B, C, H, W = audio_mels.size()
+        pad = self.seq_len - (C % self.seq_len) + 1 # 25
+        audio_mels_pad = torch.zeros(B, C + pad, H, W).to(audio_mels.device)
+        audio_mels_pad[:, 0:C, :, :] = audio_mels
         # audio_mels_pad.size() -- [1, 225, 1, 80, 16]
 
         bs = image_exp_pose.shape[0]
@@ -52,49 +52,25 @@ class Audio2Pose(nn.Module):
         image_pose = image_exp_pose[:, 0, 64:70]  # [1, 200, 70] ==> [1, 6]
 
         # we regard the reference as the first frame
-        indiv_mels_use = audio_mels[:, 1:] # size() -- [1, 224, 1, 80, 16], 
-        num_frames = int(audio_mels.shape[1]) - 1 # ==> 199
-        # num_frames = C + pad -1 # int(num_frames) - 1 # ==> 224
-
+        indiv_mels_use = audio_mels_pad[:, 1:] # size() -- [1, 224, 1, 80, 16], 
+        num_frames = C + pad -1 # int(num_frames) - 1 # ==> 224
         div = num_frames // self.seq_len # ==> 7
-        re = num_frames % self.seq_len # ==> 7
 
         pose_pred_list: List[torch.Tensor] = [torch.zeros(image_pose.unsqueeze(1).shape, 
                                 dtype=image_pose.dtype, 
                                 device=image_pose.device)] # size() -- [1, 1, 6]
         for i in range(div):
-            # Fix Bug: z randn make result is variable for onnx test, so we limit it with 0.1            
+            # Fix Bug: z randn make result is variable for onnx test, so we limit it with 0.05            
             # z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # size() [1, 64]
-            z = 0.1 * torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # size() [1, 64]
+            z = 0.05 * torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # size() [1, 64]
 
             # indiv_mels_use -- [1, 224, 1, 80, 16]
-            audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len : (i+1)*self.seq_len, :, :, :])
+            audio_emb = self.audio_encoder(indiv_mels_use[:, i*self.seq_len : (i+1)*self.seq_len, :, :])
             # audio_emb.size() -- [1, 32, 512]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             y = self.netG(image_pose, class_id, z, audio_emb) # CVAE(...), size() -- [1, 32, 6]
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             pose_pred_list.append(y)
-        # pose_pred_list is list: len = 7
-        #     tensor [item] size: [1, 1, 6], min: 0.0, max: 0.0, mean: 0.0
-        #     tensor [item] size: [1, 32, 6], min: -0.10267, max: 0.066458, mean: -0.006753
-        #     tensor [item] size: [1, 32, 6], min: -0.092499, max: 0.178642, mean: -0.004705
-        #     tensor [item] size: [1, 32, 6], min: -0.319835, max: 0.152774, mean: 0.009976
-        #     tensor [item] size: [1, 32, 6], min: -0.059921, max: 0.110091, mean: -0.000214
-        #     tensor [item] size: [1, 32, 6], min: -0.101808, max: 0.073021, mean: -0.005576
-        #     tensor [item] size: [1, 32, 6], min: -0.038888, max: 0.255433, mean: 0.032795
-        if re != 0:
-            z = torch.randn(bs, self.latent_dim).to(image_exp_pose.device) # [1, 64]
-            audio_emb = self.audio_encoder(indiv_mels_use[:, -self.seq_len:, :, :, :])
-            # audio_emb.size() -- [1, 32, 512]
-            if audio_emb.shape[1] != self.seq_len:
-                pad_dim = self.seq_len - audio_emb.shape[1]
-                pad_audio_emb = audio_emb[:, :1].repeat(1, pad_dim, 1) 
-                audio_emb = torch.cat([pad_audio_emb, audio_emb], 1) 
-
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            y = self.netG(image_pose, class_id, z, audio_emb)  # CVAE(...), size() -- [1, 32, 6]
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            pose_pred_list.append(y[:, -re:, :])   
         
         audio_pose_pred = torch.cat(pose_pred_list, dim = 1) # size() -- [1, 200, 6]
         # image_exp_pose[:, :1, 64:70].size() -- [1, 1, 6]
@@ -245,9 +221,9 @@ class AudioEncoder(nn.Module):
             Conv2d(512, 512, kernel_size=1, stride=1, padding=0),)
 
     def forward(self, audio_sequences):
-        # tensor [audio_sequences] size: [1, 32, 1, 80, 16], min: -3.269791, max: 2.590095, mean: -0.766574
-        B, C, D, H, W = audio_sequences.size()
-        audio_sequences = audio_sequences.reshape(B*C, D, H, W)
+        # tensor [audio_sequences] size: [1, 32, 80, 16], min: -3.269791, max: 2.590095, mean: -0.766574
+        B, C, H, W = audio_sequences.size()
+        audio_sequences = audio_sequences.reshape(C, B, H, W)
         # size() ==> [32, 1, 80, 16]
 
         audio_embedding = self.audio_encoder(audio_sequences)

@@ -26,7 +26,7 @@ class Audio2Coeff(nn.Module):
 
     def forward(self, audio_mels, audio_ratio, image_exp_pose):
         pose_style:int = 0 # xxxx_8888
-        # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+        # tensor [audio_mels] size: [1, 200, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.6575
         # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
 

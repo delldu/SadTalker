@@ -21,7 +21,7 @@ class Audio2Exp(nn.Module):
         self.netG = Audio2ExpWrapperV2()
 
     def forward(self, audio_mels, image_exp_pose, audio_ratio):
-        # tensor [audio_mels] size: [1, 200, 1, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
+        # tensor [audio_mels] size: [1, 200, 80, 16], min: -4.0, max: 2.590095, mean: -1.017794
         # tensor [image_exp_pose] size: [1, 200, 70], min: -1.156697, max: 1.459776, mean: 0.023419
         # tensor [audio_ratio] size: [1, 200, 1], min: 0.0, max: 1.0, mean: 0.58
 
@@ -30,7 +30,7 @@ class Audio2Exp(nn.Module):
         exp_predict_list = []
 
         for i in range(0, T, 10): # every 10 frames
-            audio_mel = audio_mels[:, i:i+10, :, :, :].view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
+            audio_mel = audio_mels[:, i:i+10, :, :].view(-1, 1, 80, 16) # size() -- [10, 1, 80, 16]
 
             image_exp = image_exp_pose[:, i:i+10, 0:64] # size() -- [1, 10, 64]
             audio_ratio2 = audio_ratio[:, i:i+10, :]  # size() -- [1, 10, 1]
@@ -44,24 +44,7 @@ class Audio2Exp(nn.Module):
 
         # exp_predict_list is list: len = 20
         #     tensor [item] size: [1, 10, 64], min: -1.311815, max: 1.241706, mean: -0.000448
-        #     tensor [item] size: [1, 10, 64], min: -1.364266, max: 1.255959, mean: -0.02406
-        #     tensor [item] size: [1, 10, 64], min: -1.552488, max: 1.167077, mean: -0.0372
-        #     tensor [item] size: [1, 10, 64], min: -1.5613, max: 1.150637, mean: -0.001518
-        #     tensor [item] size: [1, 10, 64], min: -1.580263, max: 1.061502, mean: 0.001655
-        #     tensor [item] size: [1, 10, 64], min: -1.627089, max: 1.103876, mean: -0.011172
-        #     tensor [item] size: [1, 10, 64], min: -1.567412, max: 1.131279, mean: -0.018819
-        #     tensor [item] size: [1, 10, 64], min: -1.687893, max: 1.210682, mean: 0.002061
-        #     tensor [item] size: [1, 10, 64], min: -1.600986, max: 1.272287, mean: -0.026018
-        #     tensor [item] size: [1, 10, 64], min: -1.524887, max: 1.095324, mean: -0.01195
-        #     tensor [item] size: [1, 10, 64], min: -1.437329, max: 1.098599, mean: -0.022959
-        #     tensor [item] size: [1, 10, 64], min: -1.516859, max: 1.124349, mean: 0.000906
-        #     tensor [item] size: [1, 10, 64], min: -1.537028, max: 1.128842, mean: -0.003933
-        #     tensor [item] size: [1, 10, 64], min: -1.557146, max: 1.139126, mean: -0.033007
-        #     tensor [item] size: [1, 10, 64], min: -1.526489, max: 1.242088, mean: -0.024945
-        #     tensor [item] size: [1, 10, 64], min: -1.553389, max: 1.113343, mean: -0.02658
-        #     tensor [item] size: [1, 10, 64], min: -1.493207, max: 1.161809, mean: 0.000331
-        #     tensor [item] size: [1, 10, 64], min: -1.465599, max: 1.08634, mean: -0.032512
-        #     tensor [item] size: [1, 10, 64], min: -1.730661, max: 1.10253, mean: -0.002466
+        #     ...
         #     tensor [item] size: [1, 10, 64], min: -1.622588, max: 1.211561, mean: 0.006403
         return torch.cat(exp_predict_list, dim=1) # size() -- [1, 200, 64]
 

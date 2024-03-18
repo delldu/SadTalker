@@ -159,12 +159,10 @@ class SADModel(nn.Module):
 
             m = orig_mel[seq, :]
             mels_list.append(m.transpose(1, 0))
-            # m = orig_mel[:, seq]
-            # mels_list.append(m)
 
         # mels[0] size() -- [80, 16]
         mels = torch.stack(mels_list, dim=0)
-        mels = mels.unsqueeze(1).unsqueeze(0) # size() -- [1, 200, 1, 80, 16]
+        mels = mels.unsqueeze(0) # size() -- [1, 200, 80, 16]
 
         return mels
 
